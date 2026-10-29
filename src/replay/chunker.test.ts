@@ -23,7 +23,7 @@ describe("chunker", () => {
       expect(p.headers.Authorization).toBe("Bearer wtp_k");
       expect(p.url).toContain("/v1/replay/sess/chunks?seq=");
     }
-  });
+  }, 30_000); // gzips ~10 MB of random text; slow on shared CI runners
 
   it("retry_same_seq_on_5xx", async () => {
     const f = chunkFetch((n) => (n <= 2 ? 503 : 200));
