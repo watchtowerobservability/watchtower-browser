@@ -33,8 +33,8 @@ importers:
         specifier: 0.8.2
         version: 0.8.2
       rrweb:
-        specifier: 2.0.0-alpha.18
-        version: 2.0.0-alpha.18
+        specifier: 2.2.0
+        version: 2.2.0
       web-vitals:
         specifier: 5.1.0
         version: 5.1.0
@@ -820,8 +820,8 @@ packages:
   rrweb-snapshot@2.2.0:
     resolution: {integrity: sha512-Tg/PiCLy+zV9C0Jfb4IAGABtt5l/UOvwW5xjFk41ZQhBfUjeqPP1rZ9HMDrFPc7cawCUEenWw54+g/4vluO5lg==}
 
-  rrweb@2.0.0-alpha.18:
-    resolution: {integrity: sha512-1mjZcB+LVoGSx1+i9E2ZdAP90fS3MghYVix2wvGlZvrgRuLCbTCCOZMztFCkKpgp7/EeCdYM4nIHJkKX5J1Nmg==}
+  rrweb@2.2.0:
+    resolution: {integrity: sha512-ofVzPq11/yIQ7WhVb++rJGI2LoPPrxdqu0QAvRA4KGeXJ7LH52jQ0VlRH4+VXn5PA/7pz85/rRkQyBUqT1LraQ==}
 
   shimmer@1.2.1:
     resolution: {integrity: sha512-sQTKC1Re/rM6XyFM6fIAGHRPVGvyXfgzIDvzoq608vM+jeyVD0Tu1E6Np0Kc2zAIFWIj963V2800iF/9LPieQw==}
@@ -1574,7 +1574,7 @@ snapshots:
     dependencies:
       postcss: 8.5.32
 
-  rrweb@2.0.0-alpha.18:
+  rrweb@2.2.0:
     dependencies:
       '@rrweb/types': 2.2.0
       '@rrweb/utils': 2.2.0
