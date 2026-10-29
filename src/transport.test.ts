@@ -56,7 +56,10 @@ describe("transport", () => {
       t += 70_000;
       await tr.flush();
     }
-    t += 59_999; // jitter factor 1 and cap 60 s: next attempt is allowed within 60 s
+    t += 59_999; // jitter factor 1 and cap 60 s: still inside the window
+    await tr.flush();
+    expect(f).toHaveBeenCalledTimes(12);
+    t += 1; // the window is exactly the 60 s cap, not 2^12 s
     await tr.flush();
     expect(f).toHaveBeenCalledTimes(13);
   });

@@ -2,7 +2,8 @@ import { build } from "esbuild";
 
 const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, target: "es2020", sourcemap: true };
 await build({ ...common, format: "esm", outfile: "dist/index.js" });
-await build({ ...common, format: "iife", globalName: "Watchtower", outfile: "dist/wt.min.js" });
+// iife has no import.meta: lazy chunks resolve next to the script tag that loaded wt.min.js.
+await build({ ...common, format: "iife", banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
 // Lazy replay chunk (rrweb record + fflate), loaded on demand by the core via `replay.scriptUrl`.
 await build({ ...common, entryPoints: ["src/replay/index.ts"], format: "esm", outfile: "dist/replay.js" });
 // Lazy dynamic-probes chunk (P6-DI1), loaded only when `probes.key` is configured.

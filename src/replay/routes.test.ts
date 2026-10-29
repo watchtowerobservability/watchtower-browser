@@ -27,6 +27,7 @@ describe("route guard", () => {
     history.pushState({}, "", "/admin/billing");
     document.getElementById("root")!.insertAdjacentHTML("beforeend", "<p>invoice-4242-secret</p>");
     await new Promise((r) => setTimeout(r, 50));
+    document.querySelector("#root p:last-child")!.remove(); // a real SPA drops the page's DOM on navigation
     history.pushState({}, "", "/home");
     t.h.stop();
     await t.h.flush();
