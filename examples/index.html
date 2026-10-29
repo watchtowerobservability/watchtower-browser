@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Watchtower browser example</title>
+<button id="b">Throw</button>
+<script type="module">
+  import { init } from "@watchtowerobservability/browser";
+  // Publishable key only (wtp_...), never a secret ingest key.
+  const wt = init({ publishableKey: "wtp_REPLACE_ME", endpoint: "https://edge.example.com", service: "example-web" });
+  document.getElementById("b").onclick = () => wt.captureError(new Error("example"));
+</script>

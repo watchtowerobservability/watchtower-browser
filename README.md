@@ -1,5 +1,7 @@
 # @watchtowerobservability/browser
 
+[![CI](https://github.com/watchtowerobservability/watchtower-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/watchtowerobservability/watchtower-browser/actions/workflows/ci.yml)
+
 ## Install
 
 ```sh
