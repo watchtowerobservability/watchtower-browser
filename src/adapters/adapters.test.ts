@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { currentRoute, setRoute } from "../instrument/navigation";
@@ -39,8 +39,10 @@ describe("adapters", () => {
     }
   });
 
-  it("framework_docs_cover_csp_and_privacy_attrs", () => {
-    const dir = join(__dirname, "../../../../docs/product/ingest/browser");
+  // The docs live in the monorepo; the published SDK mirror has no docs/ tree.
+  const docsDir = join(__dirname, "../../../../docs/product/ingest/browser");
+  it.skipIf(!existsSync(docsDir))("framework_docs_cover_csp_and_privacy_attrs", () => {
+    const dir = docsDir;
     const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
     expect(files.sort()).toEqual(["angular.md", "cdn.md", "nextjs.md", "react.md", "svelte.md", "vanilla.md", "vue.md"]);
     for (const f of files) {
