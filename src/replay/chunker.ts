@@ -100,10 +100,11 @@ export class Chunker {
     this.o.onDrop?.();
   }
 
-  /** Statuses that end the recording rather than retry. */
+  /** Statuses that end the recording rather than retry. Replay off is 404 `replay_disabled`
+   *  (403 from servers before the 404 rule). */
   private fatal(status: number, text: string): boolean {
     const why: StopReason | undefined =
-      status === 403 ? "disabled" : status === 413 ? "session_cap" : status === 422 && text.includes("mask_level_below_floor") ? "floor" : undefined;
+      status === 403 || (status === 404 && text.includes("replay_disabled")) ? "disabled" : status === 413 ? "session_cap" : status === 422 && text.includes("mask_level_below_floor") ? "floor" : undefined;
     if (!why) return false;
     this.stopped = true;
     this.pending = [];

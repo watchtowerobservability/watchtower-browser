@@ -11,15 +11,17 @@ export const baseCfg: WatchtowerConfig = {
 
 export function mkCtx(cfg: Partial<WatchtowerConfig> = {}) {
   const events: RumEventV1[] = [];
+  const logs: Array<[string, string]> = [];
   const navs: Array<(n: NavInfo) => void> = [];
   const c: Ctx = {
     cfg: { ...baseCfg, ...cfg },
     emit: (type, name, extra = {}) => void events.push({ id: "i", ts_ns: 1, type, name, attrs: {}, ...extra }),
+    log: (level, message) => void logs.push([level, message]),
     sessionId: () => "sess",
     route: () => normalizeRoute(location.pathname),
     isOwn: (u) => u.startsWith("https://edge.test") || u.startsWith("https://otlp.test"),
     onNav: (cb) => void navs.push(cb),
     net: new Map(),
   };
-  return { c, events, nav: (n: NavInfo) => navs.forEach((f) => f(n)) };
+  return { c, events, logs, nav: (n: NavInfo) => navs.forEach((f) => f(n)) };
 }

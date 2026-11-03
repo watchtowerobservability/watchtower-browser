@@ -15,6 +15,7 @@ export interface RumEventV1 {
 }
 
 import type { ReplayConfig } from "./replay/config";
+import type { AssistConfig } from "./assist";
 export type { ReplayConfig };
 
 export interface FlagAdapter {
@@ -37,6 +38,11 @@ export interface WatchtowerConfig {
   instrumentUrl?: string;
   /** capture console.error as error events (default off) */
   captureConsoleErrors?: boolean;
+  /** console levels sent as OTLP log records with the session id (default none) */
+  captureConsole?: Array<"debug" | "log" | "info" | "warn" | "error">;
+  /** automatic user-action spans: a click, submit or Enter starts a span that parents the fetch/XHR
+   * spans it causes (needs otlpEndpoint; default on). Name one with `data-wt-action="checkout"`. */
+  userActions?: boolean;
   sampleRate?: number;
   errorSampleRate?: number;
   ignoreUrls?: Matcher[];
@@ -44,11 +50,15 @@ export interface WatchtowerConfig {
   /** hashed client-side (SHA-256 + project salt) before send */
   user?: { id?: string };
   replay?: ReplayConfig;
+  /** co-browse assist (off by default; the project must turn it on too); `scriptUrl` defaults to assist.js beside the core */
+  assist?: AssistConfig & { scriptUrl?: string };
   profiling?: boolean;
   flags?: FlagAdapter[];
   posthog?: { register?: boolean };
   /** dynamic probes: an ingestion key with scope `probes:read`, and the lazy chunk URL (default probes.js beside the core) */
   probes?: { key: string; url?: string };
+  /** user feedback (ERR-014): the lazy chunk URL, default feedback.js beside the core */
+  feedback?: { scriptUrl?: string };
   /** opt-in: keep an anonymous id in localStorage (default off) */
   persistAnonId?: boolean;
   debug?: boolean;
@@ -56,6 +66,8 @@ export interface WatchtowerConfig {
 
 export interface RemoteConfig {
   rum_enabled: boolean;
+  /** the project's switch for browser log records */
+  browser_logs?: boolean;
   sample_rate?: number;
   error_sample_rate?: number;
   /** project salt for client-side user-id hashing */

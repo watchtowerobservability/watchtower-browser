@@ -6,8 +6,12 @@ await build({ ...common, format: "esm", outfile: "dist/index.js" });
 await build({ ...common, format: "iife", banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
 // Lazy replay chunk (rrweb record + fflate), loaded on demand by the core via `replay.scriptUrl`.
 await build({ ...common, entryPoints: ["src/replay/index.ts"], format: "esm", outfile: "dist/replay.js" });
+// Lazy co-browse assist chunk (RPL-012), loaded only with `assist.enabled`.
+await build({ ...common, entryPoints: ["src/assist.ts"], format: "esm", outfile: "dist/assist.js" });
 // Lazy dynamic-probes chunk (P6-DI1), loaded only when `probes.key` is configured.
 await build({ ...common, entryPoints: ["src/probes.ts"], format: "esm", outfile: "dist/probes.js" });
+// Lazy user-feedback chunk (ERR-014), loaded on the first `feedback` or `feedbackWidget` call.
+await build({ ...common, entryPoints: ["src/feedback.ts"], format: "esm", outfile: "dist/feedback.js" });
 // Lazy instrumentation chunk (errors, frustration, resources, ...). OTel tracing and web-vitals are
 // split into their own files by the dynamic imports, so the eager part stays small.
 await build({ ...common, entryPoints: ["src/instrument/index.ts"], format: "esm", splitting: true, outdir: "dist/instrument" });

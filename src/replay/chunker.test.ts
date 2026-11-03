@@ -44,7 +44,7 @@ describe("chunker", () => {
   });
 
   it("stops_on_replay_disabled_403", async () => {
-    for (const [status, body, why] of [[403, "replay_disabled", "disabled"], [413, "", "session_cap"], [422, "mask_level_below_floor", "floor"]] as const) {
+    for (const [status, body, why] of [[403, "replay_disabled", "disabled"], [404, "replay_disabled", "disabled"], [413, "", "session_cap"], [422, "mask_level_below_floor", "floor"]] as const) {
       const f = chunkFetch(() => [status, body]);
       const onStop = vi.fn();
       const c = mk(f, { onStop });

@@ -1,5 +1,7 @@
 import type { Attrs, RumEventV1, WatchtowerConfig } from "../config";
+import type { LogLevel } from "../logs";
 import type { Ctx, NavInfo, Uninstall } from "./ctx";
+import { installConsole } from "./console";
 import { installErrors } from "./errors";
 import { installFrustration } from "./frustration";
 import { installLongTasks } from "./longtasks";
@@ -10,6 +12,7 @@ import { installVitals } from "./vitals";
 export interface InstallOpts {
   cfg: WatchtowerConfig;
   emit(type: RumEventV1["type"], name: string, extra?: Partial<RumEventV1>): void;
+  log(level: LogLevel, message: string, attrs?: Attrs, span?: { trace_id?: string; span_id?: string }): void;
   sessionId(): string;
   extraAttrs?(): Attrs;
   /** local `profiling` option, overridden by remote config; read live */
@@ -33,6 +36,7 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
     isOwn: (u) => own.some((p) => u.startsWith(p)),
     onNav: (cb) => void listeners.push(cb),
     net: new Map(),
+    log: (level, message) => o.log(level, message, {}, ctx.span),
     emit: (type, name, extra = {}) =>
       o.emit(type, name, {
         ...extra,
@@ -61,6 +65,7 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
   await addAsync(async () => (await import("./tracing")).installTracing(ctx));
   add(() => installNavigation(ctx, listeners));
   add(() => installErrors(ctx));
+  add(() => installConsole(ctx));
   add(() => installResources(ctx));
   add(() => installLongTasks(ctx));
   add(() => installFrustration(ctx));

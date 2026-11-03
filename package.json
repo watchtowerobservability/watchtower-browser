@@ -1,8 +1,11 @@
 {
   "name": "@watchtowerobservability/browser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": { "type": "git", "url": "git+https://github.com/watchtowerobservability/watchtower-browser.git" },
-  "publishConfig": { "registry": "https://npm.pkg.github.com" },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "description": "Watchtower browser SDK: errors, vitals, sessions and transport",
   "type": "module",
   "packageManager": "pnpm@11.2.2",

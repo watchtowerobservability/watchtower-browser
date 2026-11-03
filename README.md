@@ -5,7 +5,6 @@
 ## Install
 
 ```sh
-echo '@watchtowerobservability:registry=https://npm.pkg.github.com' >> .npmrc
 npm install @watchtowerobservability/browser
 ```
 

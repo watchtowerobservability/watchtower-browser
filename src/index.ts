@@ -14,6 +14,7 @@ import { makeJourney, type Journey } from "./instrument/journeys";
 import { fetchRemoteConfig } from "./remote_config";
 import type { ReplayHandle } from "./replay";
 import type { MaskLevel } from "./replay/config";
+import { LogShipper, type LogLevel } from "./logs";
 import { idbStore } from "./queue";
 import { Session } from "./session";
 import { Transport, type Envelope } from "./transport";
@@ -21,6 +22,7 @@ import { Transport, type Envelope } from "./transport";
 export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter } from "./config";
 
 export type { Journey };
+export type { Feedback, FeedbackWidgetOptions } from "./feedback";
 export { growthBookAdapter, launchDarklyAdapter, openFeatureHook } from "./instrument/flags";
 
 export interface WatchtowerClient {
@@ -29,11 +31,26 @@ export interface WatchtowerClient {
   setAttribute(k: string, v: string | number | boolean): void;
   journey(name: string): Journey;
   flag(key: string, value: unknown): void;
+  /** A log record (level default info) with the session id. */
+  log(message: string, o?: { level?: "debug" | "info" | "warn" | "error"; attrs?: Attrs }): void;
+  /** Report a view by name, for apps whose routes do not map to URLs. */
+  setView(name: string): void;
+  /** Stop sending events and logs until `unpause`; the instruments stay installed. */
+  pause(): void;
+  unpause(): void;
+  /** A numeric measurement, sent as vital `custom.<name>`. */
+  measure(name: string, value: number, attrs?: Attrs): void;
+  /** A named custom event. */
+  event(name: string, attrs?: Attrs): void;
   /** Dynamic probe point: `vars` runs only while an active probe targets `name` (needs `probes.key`). */
   probe(name: string, vars: () => Record<string, unknown>): void;
   stop(): void;
   replay: { start(): void; stop(): void; flush(): Promise<void> };
   sessionId(): string;
+  /** Send user feedback, linked to the last captured error, the session and its replay (ERR-014). */
+  feedback(f: import("./feedback").Feedback): Promise<boolean>;
+  /** Add the opt-in feedback button and dialog; with `openOnError` it also asks after an error. */
+  feedbackWidget(o?: import("./feedback").FeedbackWidgetOptions): void;
   shutdown(): Promise<void>;
 }
 
@@ -44,10 +61,18 @@ const NOOP_CLIENT: WatchtowerClient = {
   setAttribute: noop,
   journey: () => ({ step: noop, fail: noop }),
   flag: noop,
+  log: noop,
+  setView: noop,
+  pause: noop,
+  unpause: noop,
+  measure: noop,
+  event: noop,
   probe: noop,
   stop: noop,
   replay: { start: noop, stop: noop, flush: () => Promise.resolve() },
   sessionId: () => "",
+  feedback: () => Promise.resolve(false),
+  feedbackWidget: noop,
   shutdown: () => Promise.resolve(),
 };
 
@@ -72,13 +97,35 @@ export function init(cfg: WatchtowerConfig): WatchtowerClient {
   }
 }
 
+/** Our browser-check runner sets `__WT_SYNTHETIC__`; k6 browser sets `k6`. Such sessions are tagged
+ * `synthetic` so RUM views can leave them out. */
+export function syntheticAttrs(w: Record<string, unknown> = window as unknown as Record<string, unknown>): Attrs {
+  const m = w.__WT_SYNTHETIC__ as { check_id?: unknown; run_id?: unknown } | undefined;
+  if (m && typeof m === "object") {
+    const a: Attrs = { synthetic: true, "synthetic.source": "watchtower" };
+    if (typeof m.check_id === "string") a["synthetic.check_id"] = m.check_id.slice(0, 64);
+    if (typeof m.run_id === "string") a["synthetic.run_id"] = m.run_id.slice(0, 64);
+    return a;
+  }
+  return "k6" in w ? { synthetic: true, "synthetic.source": "k6" } : {};
+}
+
+/** Resolves when a prerendered page is shown (at once when it was not prerendered). */
+function activated(): Promise<boolean> {
+  if (!(document as { prerendering?: boolean }).prerendering) return Promise.resolve(false);
+  return new Promise((r) => document.addEventListener("prerenderingchange", () => r(true), { once: true }));
+}
+
 function build(cfg: WatchtowerConfig): WatchtowerClient {
   const session = new Session();
-  const attrs: Attrs = {};
+  const attrs: Attrs = syntheticAttrs();
   let remote: RemoteConfig = DEFAULT_REMOTE;
   let userHash: string | undefined;
   let userPending: Promise<void> = Promise.resolve();
   let stopped = false;
+  let paused = false;
+  let lastErrorId: string | undefined;
+  let onError: (() => void) | undefined;
 
   const rate = (): number => remote.sample_rate ?? cfg.sampleRate ?? 1;
   const errRate = (): number => remote.error_sample_rate ?? cfg.errorSampleRate ?? 1;
@@ -111,11 +158,31 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
   });
 
   const emit = (type: RumEventV1["type"], name: string, extra: Partial<RumEventV1> = {}): void => {
-    if (stopped || !remote.rum_enabled) return;
+    if (stopped || paused || !remote.rum_enabled) return;
     if (!session.sampled(rate()) && !(type === "error" && rand() < errRate())) return;
     let e: RumEventV1 | null = { id: uuid(), ts_ns: Date.now() * 1e6, type, name, attrs: {}, ...extra };
     if (cfg.beforeSend) e = cfg.beforeSend(e);
-    if (e) transport.push(e);
+    if (!e) return;
+    transport.push(e);
+    if (type === "error") {
+      lastErrorId = e.id;
+      onError?.();
+    }
+  };
+
+  // the edge forwards /v1/logs to the gateway, so the RUM endpoint is a working default
+  const logs = new LogShipper(cfg.otlpEndpoint ?? cfg.endpoint, cfg.publishableKey, {
+    "service.name": cfg.service, "service.version": cfg.release, "deployment.environment.name": cfg.environment,
+  });
+  // beforeSend sees the same `action`/`log` shape it always did, so existing scrubbers keep working
+  const log = (level: LogLevel, message: string, at: Attrs = {}, span?: { trace_id?: string; span_id?: string }): void => {
+    if (stopped || paused || !remote.rum_enabled || remote.browser_logs === false || !session.sampled(rate())) return;
+    let e: RumEventV1 | null = { id: uuid(), ts_ns: Date.now() * 1e6, type: "action", name: "log",
+      attrs: { ...at, "log.level": level, message: message.slice(0, 2048) } };
+    if (cfg.beforeSend) e = cfg.beforeSend(e);
+    if (!e) return;
+    const { message: m, "log.level": lvl, ...rest } = e.attrs;
+    logs.push((lvl ?? level) as LogLevel, String(m ?? ""), { ...attrs, ...posthogAttrs(), "session.id": session.id(), ...rest }, span);
   };
 
   const hashUser = (id: string | undefined): Promise<void> =>
@@ -125,13 +192,28 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
     );
 
   const flushHidden = (): void => {
-    if (document.visibilityState === "hidden") transport.flushBeacon();
+    if (document.visibilityState === "hidden") {
+      transport.flushBeacon();
+      void logs.flush();
+    }
   };
-  const onHide = (): void => transport.flushBeacon();
+  const onHide = (): void => {
+    transport.flushBeacon();
+    void logs.flush();
+  };
+  // bfcache restore: the session may have expired while the page was frozen
+  const onShow = (e: Event): void => {
+    if ((e as PageTransitionEvent).persisted) emit("nav", "bfcache_restore", { attrs: { "session.restored": true } });
+  };
   document.addEventListener("visibilitychange", flushHidden);
   window.addEventListener("pagehide", onHide);
+  window.addEventListener("pageshow", onShow);
 
-  const ready = fetchRemoteConfig(cfg.endpoint, cfg.publishableKey).then((r) => {
+  // a prerendered page sends nothing (and starts no session work) until the user sees it
+  const ready = activated().then((pre) => {
+    if (pre) attrs["page.prerendered"] = true;
+    return fetchRemoteConfig(cfg.endpoint, cfg.publishableKey);
+  }).then((r) => {
     remote = r;
     if (cfg.posthog?.register) registerSession(session.id());
     transport.start();
@@ -162,6 +244,22 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
     })
     .catch(() => undefined);
 
+  // Co-browse assist: a lazy chunk, only fetched when `assist.enabled` is set locally.
+  let assist: { stop(): void } | undefined;
+  void ready
+    .then(async () => {
+      if (cfg.assist?.enabled !== true || stopped) return;
+      const url = cfg.assist.scriptUrl ?? new URL("assist.js", import.meta.url).href;
+      const mod = (await import(/* @vite-ignore */ url)) as typeof import("./assist");
+      const r = cfg.replay;
+      assist = mod.startAssist({
+        cfg: cfg.assist, endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(),
+        startReplay: () => void replayReady.then((h) => h?.start()),
+        mask: () => mod.maskRules(r?.maskLevel, replayRemote(remote).maskLevel, r?.maskTextSelector, r?.blockSelector),
+      });
+    })
+    .catch(() => undefined);
+
   const d = cfg.debug;
   const recordFlag = makeFlagRecorder(
     (key, at) => emit("flag", key, { attrs: at }),
@@ -174,7 +272,7 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
       if (stopped || !remote.rum_enabled) return;
       const url = cfg.instrumentUrl ?? new URL("instrument/index.js", import.meta.url).href;
       const mod = (await import(/* @vite-ignore */ url)) as typeof import("./instrument");
-      const u = await mod.install({ cfg, emit, sessionId: () => session.id(), extraAttrs: posthogAttrs,
+      const u = await mod.install({ cfg, emit, log, sessionId: () => session.id(), extraAttrs: posthogAttrs,
         profilingEnabled: () => remote.profiling?.enabled ?? cfg.profiling === true,
         setAttribute: (k, v) => void (attrs[k] = v),
       });
@@ -209,10 +307,22 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
   const stop = safe(() => {
     stopped = true;
     uninstall?.();
+    assist?.stop();
     void replayReady.then((h) => h?.stop());
     document.removeEventListener("visibilitychange", flushHidden);
     window.removeEventListener("pagehide", onHide);
+    window.removeEventListener("pageshow", onShow);
   }, undefined, d);
+
+  // User feedback: a lazy chunk, fetched on the first `feedback` or `feedbackWidget` call.
+  type FeedbackMod = typeof import("./feedback");
+  let feedbackMod: Promise<FeedbackMod> | undefined;
+  const loadFeedback = (): Promise<FeedbackMod> =>
+    (feedbackMod ??= import(/* @vite-ignore */ cfg.feedback?.scriptUrl ?? new URL("feedback.js", import.meta.url).href) as Promise<FeedbackMod>);
+  const feedbackCtx = {
+    endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(), lastErrorId: () => lastErrorId,
+    flushReplay: () => replayReady.then((h) => h?.flush()),
+  };
 
   const client: WatchtowerClient = {
     captureError: safe((err: unknown, ctx?: Attrs) => {
@@ -234,6 +344,18 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
     journey: (name: string): Journey =>
       makeJourney(name, (n, at) => safe(() => emit("journey", n, { attrs: at }), undefined, d)()),
     flag: safe(recordFlag, undefined, d),
+    log: safe((message: string, o?: { level?: LogLevel; attrs?: Attrs }) => log(o?.level ?? "info", String(message), o?.attrs), undefined, d),
+    setView: safe((name: string) => {
+      const n = String(name).slice(0, 128);
+      attrs["view.name"] = n;
+      emit("view", n, { attrs: { route: n } });
+    }, undefined, d),
+    pause: () => void (paused = true),
+    unpause: () => void (paused = false),
+    measure: safe((name: string, value: number, at?: Attrs) => {
+      if (Number.isFinite(value)) emit("vital", `custom.${String(name).slice(0, 128)}`, { value, attrs: { ...at, "wt.kind": "measurement" } });
+    }, undefined, d),
+    event: safe((name: string, at?: Attrs) => emit("action", String(name).slice(0, 128), { attrs: { ...at, "wt.kind": "event" } }), undefined, d),
     probe,
     stop,
     replay: {
@@ -242,11 +364,26 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
       flush: () => replayReady.then((h) => h?.flush()).then(() => undefined, () => undefined),
     },
     sessionId: safe(() => session.id(), "", d),
+    feedback: (f) => Promise.resolve().then(loadFeedback).then((m) => m.sendFeedback(feedbackCtx, f)).catch(() => false),
+    feedbackWidget: safe((o?: import("./feedback").FeedbackWidgetOptions) => {
+      void loadFeedback().then((m) => {
+        if (stopped) return;
+        const w = m.mountWidget(feedbackCtx, o);
+        let last = 0;
+        if (o?.openOnError) {
+          onError = () => {
+            if (Date.now() - last < 60_000) return;
+            last = Date.now();
+            w.open(true);
+          };
+        }
+      }).catch(() => undefined);
+    }, undefined, d),
     shutdown: async () => {
       try {
         stop();
         await ready;
-        await transport.shutdown();
+        await Promise.all([transport.shutdown(), logs.flush()]);
       } catch {
         /* never throws */
       }

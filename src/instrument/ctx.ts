@@ -1,4 +1,5 @@
 import type { Attrs, Matcher, RumEventV1, WatchtowerConfig } from "../config";
+import type { LogLevel } from "../logs";
 
 export interface NetInfo {
   status?: number;
@@ -15,6 +16,8 @@ export interface NavInfo {
 export interface Ctx {
   cfg: WatchtowerConfig;
   emit(type: RumEventV1["type"], name: string, extra?: Partial<RumEventV1>): void;
+  /** an OTLP log record, in the active view span */
+  log(level: LogLevel, message: string): void;
   sessionId(): string;
   route(): string;
   /** true for the SDK's own endpoints: never instrumented, never reported */

@@ -7,6 +7,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor, WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import { LIMITS, type Matcher, type WatchtowerConfig } from "../config";
 import { posthogAttrs } from "../posthog";
+import { ActionContextManager, installUserActions } from "./actions";
 import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx";
 
 /** Same-origin is deliberately not implicit; the Watchtower endpoints never get a trace header. */
@@ -50,6 +51,8 @@ export function installTracing(ctx: Ctx): Uninstall {
     url: `${base}/v1/traces`,
     headers: { Authorization: `Bearer ${cfg.publishableKey}` },
   });
+  const cm = new ActionContextManager();
+  let actions: ReturnType<typeof installUserActions> | undefined;
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes({
       "service.name": cfg.service,
@@ -62,18 +65,19 @@ export function installTracing(ctx: Ctx): Uninstall {
     spanProcessors: [
       {
         // session.id and the PostHog ids on every span
-        onStart: (span) => {
+        onStart: (span, parent) => {
           span.setAttribute("session.id", ctx.sessionId());
           for (const [k, v] of Object.entries({ ...posthogAttrs(), ...ctx.extraAttrs?.() })) span.setAttribute(k, v);
+          actions?.onStart(span, parent);
         },
-        onEnd: () => undefined,
+        onEnd: (span) => actions?.onEnd(span as unknown as Span),
         forceFlush: () => Promise.resolve(),
         shutdown: () => Promise.resolve(),
       },
       new BatchSpanProcessor(exporter),
     ],
   });
-  provider.register({ propagator: makePropagator(cfg, ctx.isOwn) });
+  provider.register({ propagator: makePropagator(cfg, ctx.isOwn), contextManager: cm });
 
   const record = (span: Span, status: number | undefined, failed: boolean): void => {
     const url = scrubUrl(spanUrl(span));
@@ -102,6 +106,7 @@ export function installTracing(ctx: Ctx): Uninstall {
 
   // Page-load and route-change spans; the latest one is the "active span" for errors and profiles.
   const tracer = provider.getTracer("@watchtower/browser");
+  if (cfg.userActions !== false) actions = installUserActions(ctx, tracer, cm);
   const setActive = (s: Span): void => {
     const sc = s.spanContext();
     ctx.span = { trace_id: sc.traceId, span_id: sc.spanId };
@@ -127,6 +132,7 @@ export function installTracing(ctx: Ctx): Uninstall {
   });
 
   return () => {
+    actions?.uninstall();
     unregister();
     window.removeEventListener("load", endLoad);
     void provider.shutdown().catch(() => undefined);

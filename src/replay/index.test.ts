@@ -44,8 +44,8 @@ describe("lifecycle", () => {
     expect(t.h.recording()).toBe(false);
   });
 
-  it("stops when the server answers 403", async () => {
-    const t = setup({}, {}, chunkFetch(() => [403, "replay_disabled"]));
+  it("stops when the server answers 404 replay_disabled", async () => {
+    const t = setup({}, {}, chunkFetch(() => [404, "replay_disabled"]));
     t.h.start();
     await t.h.flush();
     await vi.waitFor(() => expect(t.h.recording()).toBe(false));
