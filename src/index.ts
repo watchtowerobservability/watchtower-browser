@@ -172,7 +172,9 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
 
   // the edge forwards /v1/logs to the gateway, so the RUM endpoint is a working default
   const logs = new LogShipper(cfg.otlpEndpoint ?? cfg.endpoint, cfg.publishableKey, {
-    "service.name": cfg.service, "service.version": cfg.release, "deployment.environment.name": cfg.environment,
+    "service.name": cfg.service,
+    ...(cfg.release ? { "service.version": cfg.release } : {}),
+    ...(cfg.environment ? { "deployment.environment.name": cfg.environment } : {}),
   });
   // beforeSend sees the same `action`/`log` shape it always did, so existing scrubbers keep working
   const log = (level: LogLevel, message: string, at: Attrs = {}, span?: { trace_id?: string; span_id?: string }): void => {

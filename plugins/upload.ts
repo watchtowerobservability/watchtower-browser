@@ -38,7 +38,7 @@ export async function uploadMaps(o: UploadOptions, maps: Array<[string, string]>
       const res = await f(`${o.api.replace(/\/+$/, "")}/v1/projects/${encodeURIComponent(o.project)}/artifacts?${q}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/octet-stream", "Content-Encoding": "gzip" },
-        body: gzipSync(await readFile(path)),
+        body: new Uint8Array(gzipSync(await readFile(path))),
       });
       if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
       if (o.deleteSourcemapsAfterUpload !== false) await rm(path, { force: true });

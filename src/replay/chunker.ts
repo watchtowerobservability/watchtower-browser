@@ -116,7 +116,7 @@ export class Chunker {
     const f = this.o.f ?? globalThis.fetch.bind(globalThis);
     return f(`${this.o.endpoint.replace(/\/$/, "")}/v1/replay/${session}/chunks?seq=${seq}`, {
       method: "POST",
-      body,
+      body: body as Uint8Array<ArrayBuffer>, // never a SharedArrayBuffer view
       keepalive,
       headers: {
         Authorization: `Bearer ${this.o.key}`,

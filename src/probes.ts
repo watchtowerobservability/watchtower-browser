@@ -84,7 +84,7 @@ export function compile(src: string): (v: Vars) => boolean {
           case "<=": return x <= y;
           case ">": return x > y;
           case ">=": return x >= y;
-          case "in": return Array.isArray(y) && y.includes(x);
+          case "in": return Array.isArray(y) && (y as unknown[]).includes(x);
           default: return typeof x === "string" && typeof y === "string" && (x as string).includes(y as string);
         }
       };

@@ -22,7 +22,7 @@ describe("sanitizer (belt and braces)", () => {
 
   it("blanks password, cc-* and one-time-code values and their later input events", () => {
     const s = new Sanitizer();
-    for (const [i, attrs] of [{ type: "password" }, { autocomplete: "cc-number" }, { autocomplete: "one-time-code" }].entries()) {
+    for (const [i, attrs] of ([{ type: "password" }, { autocomplete: "cc-number" }, { autocomplete: "one-time-code" }] as Record<string, string>[]).entries()) {
       const e = snap({ ...attrs, value: "hunter2-secret" });
       e.data.node.id = i + 10;
       s.apply(e);
