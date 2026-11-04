@@ -49,6 +49,7 @@ describe("upload", () => {
     const bad = vi.fn(() => Promise.resolve(new Response("no", { status: 500 })));
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const o = { api: "https://a", project: "p", apiKey: "k", release: "r", fetch: bad as never };
+    vi.stubEnv("CI", ""); // the default is warn-only when not in CI; the runner sets CI=true, so pin it for this case
     await expect(uploadMaps(o, [["app.js.map", path]])).resolves.toBeUndefined();
     await expect(uploadMaps({ ...o, failOnError: true }, [["app.js.map", path]])).rejects.toThrow(/upload failed/);
   });
