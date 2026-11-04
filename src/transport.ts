@@ -195,6 +195,15 @@ export class Transport {
     }
   }
 
+  /** Consent revoked: drop everything queued, here and offline, and stop sending. */
+  discard(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.started = false;
+    this.queue.take(this.queue.length);
+    void this.o.offline?.drain().catch(() => undefined);
+  }
+
   async shutdown(): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;

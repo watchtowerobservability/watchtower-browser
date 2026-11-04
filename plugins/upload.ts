@@ -7,17 +7,20 @@ export interface UploadOptions {
   project: string;
   /** Defaults to `$WT_API_KEY`. Must be a secret key; publishable keys (`wtp_`) are refused. */
   apiKey?: string;
+  /** Defaults to `$WT_RELEASE`, else the short sha (`git rev-parse --short HEAD`), matching deploy markers and `service.version`. */
   release?: string;
   /** Default true. */
   deleteSourcemapsAfterUpload?: boolean;
+  /** Defaults to true when `$CI` is set (a broken upload fails the build), else warn only. */
   failOnError?: boolean;
   fetch?: typeof fetch;
 }
 
 export function resolveRelease(o: UploadOptions): string {
   if (o.release) return o.release;
+  if (process.env.WT_RELEASE) return process.env.WT_RELEASE;
   try {
-    return execSync("git rev-parse HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execSync("git rev-parse --short HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "";
   }
@@ -30,14 +33,30 @@ export async function uploadMaps(o: UploadOptions, maps: Array<[string, string]>
   if (key.startsWith("wtp_")) throw new Error("watchtower: refusing to upload with a publishable key; use a secret API key");
   const f = o.fetch ?? fetch;
   const release = resolveRelease(o);
+  const base = `${o.api.replace(/\/+$/, "")}/v1/projects/${encodeURIComponent(o.project)}`;
+  const auth = { Authorization: `Bearer ${key}` };
   const errors: string[] = [];
+  if (release && maps.length) {
+    // POST /releases is idempotent (201 new, 200 existing); artifacts are refused for an unknown release.
+    try {
+      const res = await f(`${base}/releases`, {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ version: release }),
+      });
+      if (!res.ok) throw new Error(`release ${release}: HTTP ${res.status}`);
+    } catch (e) {
+      maps = [];
+      errors.push(String(e));
+    }
+  }
   for (const [name, path] of maps) {
     try {
       const q = new URLSearchParams({ kind: "sourcemap", name });
       if (release) q.set("release", release);
-      const res = await f(`${o.api.replace(/\/+$/, "")}/v1/projects/${encodeURIComponent(o.project)}/artifacts?${q}`, {
+      const res = await f(`${base}/artifacts?${q}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/octet-stream", "Content-Encoding": "gzip" },
+        headers: { ...auth, "Content-Type": "application/octet-stream", "Content-Encoding": "gzip" },
         body: new Uint8Array(gzipSync(await readFile(path))),
       });
       if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
@@ -46,6 +65,6 @@ export async function uploadMaps(o: UploadOptions, maps: Array<[string, string]>
       errors.push(String(e));
     }
   }
-  if (errors.length && o.failOnError) throw new Error(`watchtower source map upload failed: ${errors.join("; ")}`);
+  if (errors.length && (o.failOnError ?? !!process.env.CI)) throw new Error(`watchtower source map upload failed: ${errors.join("; ")}`);
   for (const e of errors) console.warn("[watchtower]", e);
 }

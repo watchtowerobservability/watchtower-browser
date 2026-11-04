@@ -70,6 +70,8 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
   add(() => installLongTasks(ctx));
   add(() => installFrustration(ctx));
   await addAsync(() => installVitals(ctx));
+  // opt-in, its own lazy chunk: nothing is fetched or patched without the `storage` option
+  if (cfg.storage) await addAsync(async () => (await import("./storage")).installStorage(ctx));
   const enabled = o.profilingEnabled;
   if (enabled?.()) {
     await addAsync(async () =>

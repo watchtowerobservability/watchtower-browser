@@ -17,6 +17,8 @@ it("size_budget_core_under_12kib_gz", async () => {
   });
   const gz = gzipSync(r.outputFiles[0]!.contents).length;
   expect(gz).toBeLessThan(CORE_BUDGET_GZ);
+  // client storage monitoring is an opt-in lazy chunk, never part of the core
+  expect(r.outputFiles[0]!.text).not.toContain("cache_storage");
 });
 
 it("rum_bundle_under_35kib_gz", async () => {

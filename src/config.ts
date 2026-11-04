@@ -4,7 +4,7 @@ export type Matcher = string | RegExp;
 export interface RumEventV1 {
   id: string;
   ts_ns: number;
-  type: "view" | "vital" | "error" | "resource" | "action" | "longtask" | "journey" | "frustration" | "flag" | "nav";
+  type: "view" | "vital" | "error" | "resource" | "action" | "longtask" | "journey" | "frustration" | "flag" | "nav" | "db" | "storage";
   name: string;
   value?: number;
   attrs: Attrs;
@@ -53,15 +53,27 @@ export interface WatchtowerConfig {
   /** co-browse assist (off by default; the project must turn it on too); `scriptUrl` defaults to assist.js beside the core */
   assist?: AssistConfig & { scriptUrl?: string };
   profiling?: boolean;
+  /** opt-in client storage monitoring (IndexedDB, Cache Storage, localStorage, quota; sql.js/wa-sqlite via
+   * the `/storage` entry): slow or failed operations as `db` events, sizes as `storage` events. A lazy chunk. */
+  storage?: boolean | StorageConfig;
   flags?: FlagAdapter[];
   posthog?: { register?: boolean };
   /** dynamic probes: an ingestion key with scope `probes:read`, and the lazy chunk URL (default probes.js beside the core) */
   probes?: { key: string; url?: string };
   /** user feedback (ERR-014): the lazy chunk URL, default feedback.js beside the core */
   feedback?: { scriptUrl?: string };
+  /** "pending": nothing runs or is sent (no session, no config fetch) until `grantConsent()`. Default "granted". */
+  consent?: "pending" | "granted";
   /** opt-in: keep an anonymous id in localStorage (default off) */
   persistAnonId?: boolean;
   debug?: boolean;
+}
+
+export interface StorageConfig {
+  /** async operations at or over this many ms are reported (default 100); sync main-thread work uses 16 ms, one frame */
+  slowMs?: number;
+  /** quota and size sample interval (default 300000; 0 = only once at start) */
+  sampleMs?: number;
 }
 
 export interface RemoteConfig {

@@ -48,6 +48,16 @@ export class Session {
     return s;
   }
 
+  /** Consent revoked: forget the session id. */
+  clear(): void {
+    this.mem = undefined;
+    try {
+      globalThis.sessionStorage?.removeItem(KEY);
+    } catch {
+      /* blocked storage */
+    }
+  }
+
   id(): string {
     return this.touch().id;
   }

@@ -42,6 +42,12 @@ export class LogShipper {
     else this.timer ??= setTimeout(() => void this.flush(), FLUSH_MS);
   }
 
+  discard(): void {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    this.buf = [];
+  }
+
   /** shortcut: a failed POST drops its records (no retry or offline queue), add one if logs prove lossy. */
   async flush(): Promise<void> {
     clearTimeout(this.timer);

@@ -1,6 +1,6 @@
 {
   "name": "@watchtowerobservability/browser",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "repository": { "type": "git", "url": "git+https://github.com/watchtowerobservability/watchtower-browser.git" },
   "publishConfig": {
     "access": "public",
@@ -14,6 +14,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
+    "./storage": "./dist/storage.js",
     "./react": "./dist/adapters/react.js",
     "./next": "./dist/adapters/next.js",
     "./vue": "./dist/adapters/vue.js",

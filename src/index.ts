@@ -19,7 +19,7 @@ import { idbStore } from "./queue";
 import { Session } from "./session";
 import { Transport, type Envelope } from "./transport";
 
-export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter } from "./config";
+export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter, StorageConfig } from "./config";
 
 export type { Journey };
 export type { Feedback, FeedbackWidgetOptions } from "./feedback";
@@ -52,6 +52,10 @@ export interface WatchtowerClient {
   /** Add the opt-in feedback button and dialog; with `openOnError` it also asks after an error. */
   feedbackWidget(o?: import("./feedback").FeedbackWidgetOptions): void;
   shutdown(): Promise<void>;
+  /** Start the SDK after `init({ consent: "pending" })`; a no-op while already running. */
+  grantConsent(): void;
+  /** Stop, drop queued events and logs, and clear `wt.session`; `grantConsent()` starts afresh. */
+  revokeConsent(): void;
 }
 
 const noop = (): void => undefined;
@@ -74,6 +78,8 @@ const NOOP_CLIENT: WatchtowerClient = {
   feedback: () => Promise.resolve(false),
   feedbackWidget: noop,
   shutdown: () => Promise.resolve(),
+  grantConsent: noop,
+  revokeConsent: noop,
 };
 
 /** Every public method swallows its own errors: the SDK never throws into the host app. */
@@ -90,11 +96,32 @@ function safe<A extends unknown[], R>(fn: (...a: A) => R, dflt: R, debug?: boole
 
 export function init(cfg: WatchtowerConfig): WatchtowerClient {
   try {
-    return build(cfg);
+    return gated(cfg);
   } catch (e) {
     if (cfg?.debug) console.warn("[watchtower] init failed", e);
     return NOOP_CLIENT;
   }
+}
+
+type Built = { client: WatchtowerClient; revoke: () => void };
+
+/** Consent gate: calls go to the running client, or to the no-op one until consent is granted
+ * (calls made before the grant are dropped, not queued). */
+function gated(cfg: WatchtowerConfig): WatchtowerClient {
+  let cur: Built | undefined = cfg.consent === "pending" ? undefined : build(cfg);
+  const c = (): WatchtowerClient => cur?.client ?? NOOP_CLIENT;
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(NOOP_CLIENT) as Array<keyof WatchtowerClient>) {
+    out[k] = (...a: unknown[]) => (c()[k] as (...x: unknown[]) => unknown)(...a);
+  }
+  out.replay = { start: () => c().replay.start(), stop: () => c().replay.stop(), flush: () => c().replay.flush() };
+  out.grantConsent = safe(() => void (cur ??= build(cfg)), undefined, cfg.debug);
+  out.revokeConsent = safe(() => {
+    cur?.revoke();
+    cur = undefined;
+    new Session().clear();
+  }, undefined, cfg.debug);
+  return out as unknown as WatchtowerClient;
 }
 
 /** Our browser-check runner sets `__WT_SYNTHETIC__`; k6 browser sets `k6`. Such sessions are tagged
@@ -116,13 +143,14 @@ function activated(): Promise<boolean> {
   return new Promise((r) => document.addEventListener("prerenderingchange", () => r(true), { once: true }));
 }
 
-function build(cfg: WatchtowerConfig): WatchtowerClient {
+function build(cfg: WatchtowerConfig): Built {
   const session = new Session();
   const attrs: Attrs = syntheticAttrs();
   let remote: RemoteConfig = DEFAULT_REMOTE;
   let userHash: string | undefined;
   let userPending: Promise<void> = Promise.resolve();
   let stopped = false;
+  let revoked = false;
   let paused = false;
   let lastErrorId: string | undefined;
   let onError: (() => void) | undefined;
@@ -217,6 +245,7 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
     return fetchRemoteConfig(cfg.endpoint, cfg.publishableKey);
   }).then((r) => {
     remote = r;
+    if (revoked) return; // a plain shutdown still starts the transport so it can flush what was queued
     if (cfg.posthog?.register) registerSession(session.id());
     transport.start();
   });
@@ -390,9 +419,18 @@ function build(cfg: WatchtowerConfig): WatchtowerClient {
         /* never throws */
       }
     },
+    grantConsent: noop,
+    revokeConsent: noop,
   };
 
   if (cfg.user?.id) userPending = ready.then(() => hashUser(cfg.user?.id));
   cfg.flags?.forEach((a) => a.attach(client.flag));
-  return client;
+  const revoke = (): void => {
+    revoked = true;
+    stop();
+    transport.discard();
+    logs.discard();
+    session.clear();
+  };
+  return { client, revoke };
 }
