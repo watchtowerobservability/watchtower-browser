@@ -19,3 +19,7 @@ jobs:
       - run: pnpm install
       - run: pnpm build
       - run: pnpm test
+      - name: Webpack fixture (no critical-dependency warnings, lazy chunks split)
+        run: sh test/fixtures/webpack/run.sh
+      - name: Consumer fixtures (packed tarball: import, tsc skipLibCheck:false, next build)
+        run: sh test/fixtures/consumers.sh

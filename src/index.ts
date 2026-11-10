@@ -1,12 +1,14 @@
 import {
   DEFAULT_REMOTE,
   SDK,
+  defaultRelease,
   type Attrs,
   type RemoteConfig,
   type RumEventV1,
   type WatchtowerConfig,
 } from "./config";
 import { hashUserId, rand, uuid } from "./ids";
+import { lucidaAttrs } from "./lucida";
 import { posthogAttrs, registerSession } from "./posthog";
 import type { Uninstall } from "./instrument/ctx";
 import { makeFlagRecorder } from "./instrument/flags";
@@ -58,6 +60,16 @@ export interface WatchtowerClient {
   revokeConsent(): void;
 }
 
+declare const __WT_IIFE__: boolean;
+/** A lazy chunk. An explicit URL (or the script-tag IIFE build, which has no bundler) loads by URL,
+ * with `webpackIgnore`/`@vite-ignore` so bundlers leave the expression alone; otherwise the static
+ * `stat()` import lets webpack, Next and Vite split and resolve the chunk themselves. */
+function chunk<T>(url: string | undefined, rel: string, stat: () => Promise<T>): Promise<T> {
+  if (url) return (__WT_IIFE__ ? import(/* @vite-ignore */ url) : import("./load-url.js").then((m) => m.loadUrl(url))) as Promise<T>;
+  if (__WT_IIFE__) return import(/* webpackIgnore: true */ /* @vite-ignore */ new URL(rel, import.meta.url).href) as Promise<T>;
+  return stat();
+}
+
 const noop = (): void => undefined;
 const NOOP_CLIENT: WatchtowerClient = {
   captureError: noop,
@@ -96,7 +108,7 @@ function safe<A extends unknown[], R>(fn: (...a: A) => R, dflt: R, debug?: boole
 
 export function init(cfg: WatchtowerConfig): WatchtowerClient {
   try {
-    return gated(cfg);
+    return gated(cfg.release ? cfg : { ...cfg, release: defaultRelease() });
   } catch (e) {
     if (cfg?.debug) console.warn("[watchtower] init failed", e);
     return NOOP_CLIENT;
@@ -171,7 +183,7 @@ function build(cfg: WatchtowerConfig): Built {
       dpr: window.devicePixelRatio,
     },
     user: { id_hash: userHash },
-    attrs: { ...attrs, ...posthogAttrs(), "wt.sample_rate": rate() },
+    attrs: { ...attrs, ...posthogAttrs(), ...lucidaAttrs(), "wt.sample_rate": rate() },
   });
 
   const transport = new Transport({
@@ -203,7 +215,7 @@ function build(cfg: WatchtowerConfig): Built {
     "service.name": cfg.service,
     ...(cfg.release ? { "service.version": cfg.release } : {}),
     ...(cfg.environment ? { "deployment.environment.name": cfg.environment } : {}),
-  });
+  }, idbStore<unknown>("wt-offline-logs"));
   // beforeSend sees the same `action`/`log` shape it always did, so existing scrubbers keep working
   const log = (level: LogLevel, message: string, at: Attrs = {}, span?: { trace_id?: string; span_id?: string }): void => {
     if (stopped || paused || !remote.rum_enabled || remote.browser_logs === false || !session.sampled(rate())) return;
@@ -258,8 +270,7 @@ function build(cfg: WatchtowerConfig): Built {
   const replayReady: Promise<ReplayHandle | undefined> = ready
     .then(async () => {
       if (cfg.replay?.enabled !== true || !remote.replay.enabled) return undefined;
-      const url = cfg.replay.scriptUrl ?? new URL("replay.js", import.meta.url).href;
-      const mod = (await import(/* @vite-ignore */ url)) as typeof import("./replay");
+      const mod = await chunk(cfg.replay.scriptUrl, "replay.js", () => import("./replay/index.js"));
       const h = mod.startReplay({
         cfg: cfg.replay,
         remote: replayRemote(remote),
@@ -280,8 +291,7 @@ function build(cfg: WatchtowerConfig): Built {
   void ready
     .then(async () => {
       if (cfg.assist?.enabled !== true || stopped) return;
-      const url = cfg.assist.scriptUrl ?? new URL("assist.js", import.meta.url).href;
-      const mod = (await import(/* @vite-ignore */ url)) as typeof import("./assist");
+      const mod = await chunk(cfg.assist.scriptUrl, "assist.js", () => import("./assist.js"));
       const r = cfg.replay;
       assist = mod.startAssist({
         cfg: cfg.assist, endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(),
@@ -301,8 +311,7 @@ function build(cfg: WatchtowerConfig): Built {
   void ready
     .then(async () => {
       if (stopped || !remote.rum_enabled) return;
-      const url = cfg.instrumentUrl ?? new URL("instrument/index.js", import.meta.url).href;
-      const mod = (await import(/* @vite-ignore */ url)) as typeof import("./instrument");
+      const mod = await chunk(cfg.instrumentUrl, "instrument/index.js", () => import("./instrument/index.js"));
       const u = await mod.install({ cfg, emit, log, sessionId: () => session.id(), extraAttrs: posthogAttrs,
         profilingEnabled: () => remote.profiling?.enabled ?? cfg.profiling === true,
         setAttribute: (k, v) => void (attrs[k] = v),
@@ -320,7 +329,7 @@ function build(cfg: WatchtowerConfig): Built {
     if (!cfg.probes) return;
     probes ??= ready
       .then(async () => {
-        const mod = (await import(/* @vite-ignore */ cfg.probes!.url ?? new URL("probes.js", import.meta.url).href)) as typeof import("./probes");
+        const mod = await chunk(cfg.probes!.url, "probes.js", () => import("./probes.js"));
         const p = mod.createProbes({
           endpoint: cfg.endpoint, key: cfg.probes!.key, service: cfg.service, env: cfg.environment, version: cfg.release,
           emit: (n, at) => emit("action", n, { attrs: at }),
@@ -349,7 +358,7 @@ function build(cfg: WatchtowerConfig): Built {
   type FeedbackMod = typeof import("./feedback");
   let feedbackMod: Promise<FeedbackMod> | undefined;
   const loadFeedback = (): Promise<FeedbackMod> =>
-    (feedbackMod ??= import(/* @vite-ignore */ cfg.feedback?.scriptUrl ?? new URL("feedback.js", import.meta.url).href) as Promise<FeedbackMod>);
+    (feedbackMod ??= chunk(cfg.feedback?.scriptUrl, "feedback.js", () => import("./feedback.js")));
   const feedbackCtx = {
     endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(), lastErrorId: () => lastErrorId,
     flushReplay: () => replayReady.then((h) => h?.flush()),

@@ -82,8 +82,9 @@ export function installErrors(ctx: Ctx): Uninstall {
       return;
     }
     const e = ev as ErrorEvent;
-    const err = e.error as { name?: string; stack?: string } | null | undefined;
-    report(err?.name ?? "Error", e.message ?? "", err?.stack, false, "onerror");
+    const err = e.error as { name?: string; message?: string; stack?: string } | null | undefined;
+    // the browser prefixes ErrorEvent.message with "Uncaught <Name>: "; the Error's own message is clean
+    report(err?.name ?? "Error", (typeof err?.message === "string" ? err.message : e.message) ?? "", err?.stack, false, "onerror");
   };
   const onRejection = (ev: Event): void => {
     const r = (ev as PromiseRejectionEvent).reason as { name?: string; message?: string; stack?: string } | unknown;

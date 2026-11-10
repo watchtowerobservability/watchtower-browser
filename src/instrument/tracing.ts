@@ -105,7 +105,7 @@ export function installTracing(ctx: Ctx): Uninstall {
   });
 
   // Page-load and route-change spans; the latest one is the "active span" for errors and profiles.
-  const tracer = provider.getTracer("@watchtower/browser");
+  const tracer = provider.getTracer("@watchtowerobservability/browser");
   if (cfg.userActions !== false) actions = installUserActions(ctx, tracer, cm);
   const setActive = (s: Span): void => {
     const sc = s.spanContext();

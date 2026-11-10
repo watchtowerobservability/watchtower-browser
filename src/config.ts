@@ -102,4 +102,26 @@ export const LIMITS = {
   configTimeoutMs: 2000,
 } as const;
 
-export const SDK = { name: "@watchtower/browser", version: "0.1.0" } as const;
+/** Replaced with package.json's version by esbuild (and vitest) at build time. */
+declare const __WT_VERSION__: string;
+// esbuild and vitest define it from package.json; an app that bundles the source (apps/web) does not
+export const SDK = { name: "@watchtowerobservability/browser", version: typeof __WT_VERSION__ === "string" ? __WT_VERSION__ : "source" } as const;
+
+const loadScript = typeof document === "undefined" ? null : (document.currentScript as HTMLScriptElement | null);
+
+/** The release when `init` has none: `data-release` on the loading script tag (or any script
+ * tag), `<meta name="wt-release">`, or a build-injected `__WT_RELEASE__` / `__WATCHTOWER_RELEASE__`. */
+export function defaultRelease(): string | undefined {
+  try {
+    const g = globalThis as { __WT_RELEASE__?: unknown; __WATCHTOWER_RELEASE__?: unknown };
+    const found =
+      loadScript?.dataset?.release ||
+      document.querySelector<HTMLScriptElement>("script[data-release]")?.dataset.release ||
+      document.querySelector<HTMLMetaElement>('meta[name="wt-release"]')?.content ||
+      (typeof g.__WT_RELEASE__ === "string" ? g.__WT_RELEASE__ : "") ||
+      (typeof g.__WATCHTOWER_RELEASE__ === "string" ? g.__WATCHTOWER_RELEASE__ : "");
+    return found?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}

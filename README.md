@@ -22,7 +22,11 @@ wt.captureError(new Error("x"));
 - Transport: flush at 50 events, 5 s or page hide (`sendBeacon`, key in `?k=`: the publishable key is public by design); gzip over 1 KiB; queue of 500 (oldest dropped, counted in `wt.sdk.dropped`); exponential backoff with jitter up to 60 s; honors `Retry-After`. Public methods never throw.
 - User ids are hashed with SHA-256 and the project salt (`id_salt` from `/v1/rum/config`) before send; the raw id is never sent.
 - PostHog ids are read lazily per batch from `window.posthog` when present; nothing from PostHog is bundled.
-- Core budget: 12 KiB gzipped (`size_budget.test.ts`). Replay is a separate lazy chunk (not in this package yet).
+- Core budget: 12 KiB gzipped (`size_budget.test.ts`). Replay is a separate lazy chunk (`replay.js`, shipped in this package).
+- Bundlers (webpack 5, Next, Vite, Rollup) resolve the lazy chunks themselves from static imports; only an explicit `instrumentUrl`, `replay.scriptUrl`, ... or the `wt.min.js` script build loads by URL.
+- Tracing: set `otlpEndpoint` to your gateway's OTLP/HTTP base URL (the key-creation snippet shows it). Without it the SDK creates no spans and `propagateTo` does nothing.
+- Replay: add `replay: { enabled: true }` to `init` and turn it on for the project (`PUT /v1/projects/{prj}/privacy` with `{"replay_enabled": true}`); it is off by default (10% session sampling).
+- Localhost origins: a key may list `http://localhost:*` only after `PATCH /v1/projects/{prj}` with `{"allow_localhost": true}`.
 
 `pnpm -C sdks/browser test`, `pnpm -C sdks/browser build` (ESM + `dist/wt.min.js` IIFE).
 
@@ -76,7 +80,7 @@ files after the build. Before uploading they create the release (`POST /v1/proje
 idempotent), then post each map to `/artifacts?kind=sourcemap&release=<v>&name=<file>.map`.
 
 - Release: `release` option, else `$WT_RELEASE`, else the short sha (`git rev-parse --short HEAD`), the
-  same value the deploy markers and `service.version` use. Pass the same value to `init({ release })`.
+  same value the deploy markers and `service.version` use. Pass the same value to `init({ release })`; when omitted, `init` reads `data-release` from the script tag, `<meta name="wt-release">` or a build-injected `__WT_RELEASE__`.
 - Key: `apiKey` or `$WT_API_KEY`, a secret key (publishable `wtp_` keys are refused). Maps are deleted after
   upload unless `deleteSourcemapsAfterUpload: false`; upload errors fail the build when `$CI` is set (`failOnError` defaults to true there) and only warn otherwise; set `failOnError` explicitly to override.
 

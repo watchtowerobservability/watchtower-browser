@@ -1,4 +1,5 @@
-import type { Attrs } from "./config";
+import { LIMITS, type Attrs } from "./config";
+import type { OfflineStore } from "./queue";
 
 export type LogLevel = "debug" | "log" | "info" | "warn" | "error";
 
@@ -17,8 +18,22 @@ export class LogShipper {
   private buf: unknown[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
   private warned = false;
+  private failures = 0;
+  private retryAt = 0;
+  private parked = false;
 
-  constructor(private readonly base: string, private readonly key: string, private readonly resource: Attrs) {}
+  /**
+   * `offline` holds batches the network refused (delivery is at-least-once: a lost response resends).
+   * It is read back after a successful POST or a retry of this session's own failure, so records stored
+   * by an earlier page never leave before logging is on again.
+   */
+  constructor(
+    private readonly base: string,
+    private readonly key: string,
+    private readonly resource: Attrs,
+    private readonly offline?: OfflineStore<unknown>,
+    private readonly random: () => number = Math.random,
+  ) {}
 
   /** Once, whatever `debug` says: losing logs is not something to hide behind a flag. */
   private warn(why: string): void {
@@ -38,18 +53,68 @@ export class LogShipper {
       ...(span?.trace_id ? { traceId: span.trace_id } : {}),
       ...(span?.span_id ? { spanId: span.span_id } : {}),
     });
-    if (this.buf.length >= FLUSH_AT) void this.flush();
-    else this.timer ??= setTimeout(() => void this.flush(), FLUSH_MS);
+    if (this.buf.length >= FLUSH_AT && Date.now() >= this.retryAt) void this.flush();
+    else this.arm();
+  }
+
+  private arm(): void {
+    this.timer ??= setTimeout(() => void this.flush(), Math.max(FLUSH_MS, this.retryAt - Date.now()));
   }
 
   discard(): void {
     clearTimeout(this.timer);
     this.timer = undefined;
     this.buf = [];
+    this.parked = false;
+    void this.offline?.drain().catch(() => undefined);
   }
 
-  /** shortcut: a failed POST drops its records (no retry or offline queue), add one if logs prove lossy. */
+  /** Batch goes back to the front of the buffer (bounded), the next try waits with backoff or `Retry-After`. */
+  private backoff(records: unknown[], retryAfter: string | null): void {
+    this.buf = [...records, ...this.buf].slice(0, MAX_BUFFER);
+    // A timer armed by a push during the failed POST would retry too early.
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    const secs = retryAfter === null ? NaN : Number(retryAfter);
+    const exp = Math.min(LIMITS.backoffMaxMs, 1000 * 2 ** this.failures) * (0.5 + this.random() / 2);
+    this.failures++;
+    this.retryAt = Date.now() + (Number.isFinite(secs) ? Math.min(secs * 1000, LIMITS.backoffMaxMs) : exp);
+    this.arm();
+  }
+
+  /** Network failure: keep the batch across page loads when a store exists, else in memory. */
+  private async park(records: unknown[]): Promise<void> {
+    try {
+      if (this.offline) {
+        await this.offline.save(records);
+        this.parked = true;
+        return this.backoff([], null);
+      }
+    } catch {
+      /* fall through to memory */
+    }
+    this.backoff(records, null);
+  }
+
+  private async restore(): Promise<void> {
+    try {
+      const saved = (await this.offline?.drain()) ?? [];
+      const room = Math.max(0, MAX_BUFFER - this.buf.length);
+      this.buf.push(...saved.slice(0, room));
+      if (saved.length > room) await this.offline?.save(saved.slice(room));
+      if (this.buf.length) this.arm();
+    } catch {
+      /* offline storage is best effort */
+    }
+  }
+
+  /** Sends now, ignoring any backoff window (the page may be going away). Never throws. */
   async flush(): Promise<void> {
+    // Only this session's own failure brings stored records back without a success first.
+    if (!this.buf.length && this.parked) {
+      this.parked = false;
+      await this.restore();
+    }
     clearTimeout(this.timer);
     this.timer = undefined;
     if (!this.buf.length) return;
@@ -69,9 +134,19 @@ export class LogShipper {
         method: "POST", keepalive: body.length < 60_000,
         headers: { "content-type": "application/json", authorization: `Bearer ${this.key}` }, body,
       });
-      if (r.status === 404 || r.status === 405) this.warn(`HTTP ${r.status} from ${url}`);
+      if (r.status < 300) {
+        this.failures = 0;
+        this.retryAt = 0;
+        await this.restore();
+      } else if (r.status === 429 || r.status >= 500) {
+        this.backoff(logRecords, r.headers?.get("Retry-After") ?? null);
+      } else {
+        // Other 4xx: the batch or the endpoint is wrong, a retry cannot help.
+        this.warn(`HTTP ${r.status} from ${url}`);
+      }
     } catch {
       this.warn(`no answer from ${url}`);
+      await this.park(logRecords);
     }
   }
 }

@@ -1,9 +1,10 @@
 import { build } from "esbuild";
-
-const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, target: "es2020", sourcemap: true };
-await build({ ...common, format: "esm", outfile: "dist/index.js" });
+import { mkdirSync, writeFileSync } from "node:fs";
+import { define, lazyChunks } from "./esbuild.shared.mjs";
+const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, target: "es2020", sourcemap: true, define: { ...define, __WT_IIFE__: "false" } };
+await build({ ...common, format: "esm", plugins: [lazyChunks], outfile: "dist/index.js" });
 // iife has no import.meta: lazy chunks resolve next to the script tag that loaded wt.min.js.
-await build({ ...common, format: "iife", banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
+await build({ ...common, format: "iife", plugins: [lazyChunks], banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { ...define, __WT_IIFE__: "true", "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
 // Lazy replay chunk (rrweb record + fflate), loaded on demand by the core via `replay.scriptUrl`.
 await build({ ...common, entryPoints: ["src/replay/index.ts"], format: "esm", outfile: "dist/replay.js" });
 // Lazy co-browse assist chunk (RPL-012), loaded only with `assist.enabled`.
@@ -20,3 +21,6 @@ await build({ ...common, entryPoints: ["src/instrument/index.ts"], format: "esm"
 // Framework adapters (react stays an external peer) and Node build plugins.
 await build({ ...common, entryPoints: ["src/adapters/react.tsx", "src/adapters/next.ts", "src/adapters/vue.ts", "src/adapters/angular.ts", "src/adapters/svelte.ts"], format: "esm", splitting: true, external: ["react"], outdir: "dist/adapters" });
 await build({ ...common, entryPoints: ["plugins/vite.ts", "plugins/rollup.ts", "plugins/webpack.ts"], platform: "node", format: "esm", splitting: true, outdir: "dist/plugins" });
+// Written verbatim, not minified: the bundler hints must survive (see src/load-url.ts).
+mkdirSync("dist", { recursive: true });
+writeFileSync("dist/load-url.js", "export const loadUrl = (u) => import(/* webpackIgnore: true */ /* @vite-ignore */ u);\n");

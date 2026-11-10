@@ -1,5 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
+// @ts-expect-error plain .mjs shared with esbuild.config.mjs
+import { define, lazyChunks } from "../esbuild.shared.mjs";
 import { expect, it } from "vitest";
 
 /** Eager core budget. The whole RUM bundle (core + instrumentation) has its own budget below. */
@@ -12,6 +14,8 @@ it("size_budget_core_under_12kib_gz", async () => {
     bundle: true,
     minify: true,
     format: "iife",
+    plugins: [lazyChunks],
+    define: { ...define, __WT_IIFE__: "true" },
     target: "es2020",
     write: false,
   });
@@ -28,6 +32,8 @@ it("rum_bundle_under_35kib_gz", async () => {
     minify: true,
     format: "esm",
     splitting: true,
+    plugins: [lazyChunks],
+    define: { ...define, __WT_IIFE__: "false" },
     outdir: "out",
     target: "es2020",
     write: false,

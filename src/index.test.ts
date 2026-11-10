@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { init } from "./index";
+import { init as initSdk, type WatchtowerClient } from "./index";
 import { bodyOf, stubFetch } from "./testutil";
 
 const cfg = { publishableKey: "wtp_abcd1234_x", endpoint: "https://edge.test", service: "web" };
 
+// every client a test starts is stopped after it, so its pagehide listener cannot fire in later tests
+const live: WatchtowerClient[] = [];
+const init: typeof initSdk = (c) => {
+  const x = initSdk(c);
+  live.push(x);
+  return x;
+};
+
 beforeEach(() => sessionStorage.clear());
 afterEach(() => {
+  for (const x of live.splice(0)) x.stop();
   vi.unstubAllGlobals();
   delete (globalThis as { posthog?: unknown }).posthog;
 });
@@ -14,6 +23,16 @@ async function sent(f: ReturnType<typeof stubFetch>) {
   await vi.waitFor(() => expect(f.events().length).toBeGreaterThan(0), { timeout: 3000 });
   return bodyOf(f.events()[0]!.init);
 }
+
+describe("lucida link", () => {
+  it("lucida_session_id_attached_when_present", async () => {
+    (globalThis as any).lucida = { getSessionId: () => "ls1" };
+    const { lucidaAttrs } = await import("./lucida");
+    expect(lucidaAttrs()["lucida.session_id"]).toBe("ls1");
+    delete (globalThis as any).lucida;
+    expect(lucidaAttrs()).toEqual({});
+  });
+});
 
 describe("posthog link", () => {
   it("posthog_ids_attached_when_present", async () => {
@@ -34,6 +53,34 @@ describe("posthog link", () => {
     void c.shutdown();
     const b = await sent(f);
     expect(b.attrs["posthog.distinct_id"]).toBeUndefined();
+  });
+});
+
+describe("default release", () => {
+  afterEach(() => {
+    document.head.innerHTML = "";
+    delete (globalThis as { __WT_RELEASE__?: unknown }).__WT_RELEASE__;
+  });
+  it("reads_data_release_meta_or_global_when_init_has_none", async () => {
+    const s = document.createElement("script");
+    s.dataset.release = "1.2.3";
+    document.head.append(s);
+    const f = stubFetch();
+    const c = init(cfg);
+    c.flag("a", 1);
+    void c.shutdown();
+    expect((await sent(f)).app.release).toBe("1.2.3");
+    s.remove();
+    (globalThis as { __WT_RELEASE__?: string }).__WT_RELEASE__ = "9.9.9";
+    const { defaultRelease } = await import("./config");
+    expect(defaultRelease()).toBe("9.9.9");
+  });
+  it("explicit_release_wins", async () => {
+    const f = stubFetch();
+    const c = init({ ...cfg, release: "2.0.0" });
+    c.flag("a", 1);
+    void c.shutdown();
+    expect((await sent(f)).app.release).toBe("2.0.0");
   });
 });
 
