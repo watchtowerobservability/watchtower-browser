@@ -9,6 +9,7 @@ import {
 } from "./config";
 import { hashUserId, rand, uuid } from "./ids";
 import { lucidaAttrs } from "./lucida";
+import { scrubUrl, setUrlScrubbing } from "./scrub";
 import { posthogAttrs, registerSession } from "./posthog";
 import type { Uninstall } from "./instrument/ctx";
 import { makeFlagRecorder } from "./instrument/flags";
@@ -156,6 +157,7 @@ function activated(): Promise<boolean> {
 }
 
 function build(cfg: WatchtowerConfig): Built {
+  setUrlScrubbing(cfg.urlScrubbing);
   const session = new Session();
   const attrs: Attrs = syntheticAttrs();
   let remote: RemoteConfig = DEFAULT_REMOTE;
@@ -175,15 +177,14 @@ function build(cfg: WatchtowerConfig): Built {
     sent_at_ns: Date.now() * 1e6,
     sdk: { ...SDK },
     app: { service: cfg.service, release: cfg.release, env: cfg.environment },
-    // fragment dropped: it can carry tokens
-    page: { url: location.href.split("#")[0]!, referrer: document.referrer || undefined },
+    page: { url: scrubUrl(location.href), referrer: document.referrer ? scrubUrl(document.referrer) : undefined },
     device: {
       ua: navigator.userAgent,
       viewport: [window.innerWidth, window.innerHeight],
       dpr: window.devicePixelRatio,
     },
     user: { id_hash: userHash },
-    attrs: { ...attrs, ...posthogAttrs(), ...lucidaAttrs(), "wt.sample_rate": rate() },
+    attrs: { ...attrs, ...posthogAttrs(), ...lucidaAttrs(cfg.lucida), "wt.sample_rate": rate() },
   });
 
   const transport = new Transport({

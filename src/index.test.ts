@@ -32,6 +32,14 @@ describe("lucida link", () => {
     delete (globalThis as any).lucida;
     expect(lucidaAttrs()).toEqual({});
   });
+
+  it("init_lucida_client_wins_over_the_global", async () => {
+    (globalThis as any).lucida = { getSessionId: () => "global" };
+    const { lucidaAttrs } = await import("./lucida");
+    expect(lucidaAttrs({ getSessionId: () => "mine" })["lucida.session_id"]).toBe("mine");
+    expect(lucidaAttrs({ getSessionId: () => "" })["lucida.session_id"]).toBe("global");
+    delete (globalThis as any).lucida;
+  });
 });
 
 describe("posthog link", () => {
@@ -153,5 +161,44 @@ describe("safety and privacy", () => {
     void c.shutdown();
     const b = await sent(f);
     expect(b.events.map((e: { type: string }) => e.type)).toEqual(["error"]);
+  });
+});
+
+describe("urls and tunnel", () => {
+  it("page_url_is_scrubbed_and_opt_out_keeps_the_query", async () => {
+    history.replaceState(null, "", "/reset/a1b2c3d4e5f6?token=s3cret#x");
+    let f = stubFetch();
+    let c = init(cfg);
+    c.flag("a", 1);
+    void c.shutdown();
+    expect((await sent(f)).page.url).toBe(`${location.origin}/reset/:redacted`);
+
+    sessionStorage.clear();
+    f = stubFetch();
+    c = init({ ...cfg, urlScrubbing: false });
+    c.flag("a", 1);
+    void c.shutdown();
+    expect((await sent(f)).page.url).toBe(`${location.origin}/reset/a1b2c3d4e5f6?token=s3cret`);
+    history.replaceState(null, "", "/");
+  });
+
+  it("same_origin_tunnel_endpoint_is_used_as_is", async () => {
+    const f = stubFetch();
+    const c = init({ ...cfg, endpoint: "/api/wt" });
+    c.flag("a", 1);
+    void c.shutdown();
+    await sent(f);
+    expect(f.events()[0]!.url).toBe("/api/wt/v1/rum/events");
+    expect(f.calls.some((x) => x.url === "/api/wt/v1/rum/config")).toBe(true);
+  });
+
+  it("second_grant_does_not_start_a_new_session", () => {
+    stubFetch();
+    const c = init({ ...cfg, consent: "pending" });
+    c.grantConsent();
+    const id = c.sessionId();
+    expect(id).not.toBe("");
+    c.grantConsent();
+    expect(c.sessionId()).toBe(id);
   });
 });

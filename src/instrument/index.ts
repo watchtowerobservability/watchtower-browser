@@ -8,6 +8,7 @@ import { installLongTasks } from "./longtasks";
 import { currentRoute, installNavigation } from "./navigation";
 import { installResources } from "./resources";
 import { installVitals } from "./vitals";
+import { setUrlScrubbing } from "../scrub";
 
 export interface InstallOpts {
   cfg: WatchtowerConfig;
@@ -20,14 +21,24 @@ export interface InstallOpts {
   setAttribute?(k: string, v: string): void;
 }
 
+const absolute = (u: string): string => {
+  try {
+    return new URL(u, location.href).href;
+  } catch {
+    return u;
+  }
+};
+
 /**
  * Lazy chunk, loaded by the core after remote config says RUM is on. OTel (tracing) and
  * web-vitals are further lazy chunks behind dynamic imports. Each instrument fails alone.
  */
 export async function install(o: InstallOpts): Promise<Uninstall> {
   const { cfg } = o;
+  setUrlScrubbing(cfg.urlScrubbing);
   const listeners: Array<(n: NavInfo) => void> = [];
-  const own = [cfg.endpoint, cfg.otlpEndpoint].filter((p): p is string => !!p);
+  // a same-origin tunnel endpoint (`/api/wt`) is relative; resource entries and spans carry absolute URLs
+  const own = [cfg.endpoint, cfg.otlpEndpoint].filter((p): p is string => !!p).map(absolute);
   const ctx: Ctx = {
     cfg,
     sessionId: o.sessionId,

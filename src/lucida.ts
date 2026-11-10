@@ -4,10 +4,10 @@ interface LucidaLike {
   getSessionId?: () => string;
 }
 
-/** Lucida's session id when its SDK is on the page, so Watchtower can link the same session. Never throws. */
-export function lucidaAttrs(): Attrs {
+/** Lucida's session id: the `init({ lucida })` client, else the SDK's `globalThis.lucida`. Never throws. */
+export function lucidaAttrs(client?: LucidaLike): Attrs {
   try {
-    const s = (globalThis as { lucida?: LucidaLike }).lucida?.getSessionId?.();
+    const s = (client?.getSessionId?.() || undefined) ?? (globalThis as { lucida?: LucidaLike }).lucida?.getSessionId?.();
     return s ? { "lucida.session_id": String(s).slice(0, 128) } : {};
   } catch {
     return {};

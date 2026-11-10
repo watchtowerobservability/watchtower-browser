@@ -15,6 +15,8 @@ await build({ ...common, entryPoints: ["src/probes.ts"], format: "esm", outfile:
 await build({ ...common, entryPoints: ["src/feedback.ts"], format: "esm", outfile: "dist/feedback.js" });
 // `/storage` entry: sql.js / wa-sqlite wrappers, imported by apps that use them (never by the core).
 await build({ ...common, entryPoints: ["src/storage.ts"], format: "esm", outfile: "dist/storage.js" });
+// `/consent` entry: Cookie Munch bridge (types only from the core, no runtime import).
+await build({ ...common, entryPoints: ["src/consent.ts"], format: "esm", outfile: "dist/consent.js" });
 // Lazy instrumentation chunk (errors, frustration, resources, ...). OTel tracing and web-vitals are
 // split into their own files by the dynamic imports, so the eager part stays small.
 await build({ ...common, entryPoints: ["src/instrument/index.ts"], format: "esm", splitting: true, outdir: "dist/instrument" });

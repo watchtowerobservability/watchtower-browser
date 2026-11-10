@@ -36,18 +36,15 @@ export type Uninstall = () => void;
 export const matches = (m: Matcher, url: string): boolean =>
   typeof m === "string" ? url.startsWith(m) : m.test(url);
 
-/** Query and fragment dropped: both can carry tokens. */
-export function scrubUrl(u: string): string {
-  const i = u.search(/[?#]/);
-  return i < 0 ? u : u.slice(0, i);
-}
+export { scrubScriptUrl, scrubUrl, stripQuery } from "../scrub";
+import { stripQuery } from "../scrub";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID_SEG = /^(\d+|[0-9a-f]{16,})$/i;
 
 /** `/users/42/orders/<uuid>` becomes `/users/:id/orders/:id`. */
 export function normalizeRoute(path: string): string {
-  const p = scrubUrl(path)
+  const p = stripQuery(path)
     .split("/")
     .map((s) => (UUID.test(s) || ID_SEG.test(s) ? ":id" : s))
     .join("/");

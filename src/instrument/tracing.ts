@@ -8,6 +8,7 @@ import { BatchSpanProcessor, WebTracerProvider } from "@opentelemetry/sdk-trace-
 import { LIMITS, type Matcher, type WatchtowerConfig } from "../config";
 import { posthogAttrs } from "../posthog";
 import { ActionContextManager, installUserActions } from "./actions";
+import { scrubSpanAttrs } from "../scrub";
 import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx";
 
 /** Same-origin is deliberately not implicit; the Watchtower endpoints never get a trace header. */
@@ -45,7 +46,14 @@ export function installTracing(ctx: Ctx): Uninstall {
   const cfg = ctx.cfg;
   if (!cfg.otlpEndpoint) return () => undefined;
   const base = cfg.otlpEndpoint.replace(/\/$/, "");
-  const ignoreUrls = [cfg.endpoint, cfg.otlpEndpoint, ...(cfg.ignoreUrls ?? [])].map(toRegex);
+  const abs = (u: string): string => {
+    try {
+      return new URL(u, location.href).href; // a same-origin tunnel endpoint is relative
+    } catch {
+      return u;
+    }
+  };
+  const ignoreUrls = [abs(cfg.endpoint), abs(cfg.otlpEndpoint), ...(cfg.ignoreUrls ?? [])].map(toRegex);
 
   const exporter = new OTLPTraceExporter({
     url: `${base}/v1/traces`,
@@ -70,7 +78,11 @@ export function installTracing(ctx: Ctx): Uninstall {
           for (const [k, v] of Object.entries({ ...posthogAttrs(), ...ctx.extraAttrs?.() })) span.setAttribute(k, v);
           actions?.onStart(span, parent);
         },
-        onEnd: (span) => actions?.onEnd(span as unknown as Span),
+        // the fetch/XHR instrumentations put the full URL (query included) on the span
+        onEnd: (span) => {
+          scrubSpanAttrs((span as unknown as { attributes?: Record<string, unknown> }).attributes);
+          actions?.onEnd(span as unknown as Span);
+        },
         forceFlush: () => Promise.resolve(),
         shutdown: () => Promise.resolve(),
       },
@@ -118,6 +130,7 @@ export function installTracing(ctx: Ctx): Uninstall {
   setActive(load);
   const endLoad = (): void => {
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    load.setAttribute("view.route", ctx.route()); // a router adapter may have set the template since the span started
     load.end(performance.timeOrigin + (nav?.loadEventEnd || performance.now()));
   };
   if (document.readyState === "complete") endLoad();

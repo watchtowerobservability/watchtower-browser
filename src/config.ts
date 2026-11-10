@@ -46,6 +46,12 @@ export interface WatchtowerConfig {
   sampleRate?: number;
   errorSampleRate?: number;
   ignoreUrls?: Matcher[];
+  /** default on: reported URLs (page, resource, fetch/XHR spans) lose their query string and fragment, and
+   * secret-looking path segments (UUIDs, >= 24 chars, or >= 10 chars with a letter and a digit) become `:redacted`.
+   * `false` keeps query strings and path ids (the fragment is always dropped). */
+  urlScrubbing?: boolean;
+  /** an object with `getSessionId()` (the Lucida browser SDK client); used before `globalThis.lucida` */
+  lucida?: { getSessionId?: () => string };
   beforeSend?: (e: RumEventV1) => RumEventV1 | null;
   /** hashed client-side (SHA-256 + project salt) before send */
   user?: { id?: string };

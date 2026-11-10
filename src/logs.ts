@@ -121,7 +121,7 @@ export class LogShipper {
     const logRecords = this.buf.splice(0);
     let url: string;
     try {
-      url = `${new URL(this.base).href.replace(/\/$/, "")}/v1/logs`;
+      url = `${new URL(this.base, location.href).href.replace(/\/$/, "")}/v1/logs`;
     } catch {
       return this.warn(`bad endpoint ${this.base}`);
     }

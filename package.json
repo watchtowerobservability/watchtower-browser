@@ -1,6 +1,6 @@
 {
   "name": "@watchtowerobservability/browser",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/watchtowerobservability/watchtower-browser.git"
@@ -23,6 +23,10 @@
     "./storage": {
       "types": "./dist/storage.d.ts",
       "default": "./dist/storage.js"
+    },
+    "./consent": {
+      "types": "./dist/consent.d.ts",
+      "default": "./dist/consent.js"
     },
     "./react": {
       "types": "./dist/adapters/react.d.ts",

@@ -59,6 +59,62 @@ which receives events and serves `/v1/rum/config`.
 <script>Watchtower.init({ publishableKey: "wtp_...", endpoint: "https://edge.example.com", service: "web" });</script>
 ```
 
+### Content Security Policy for Next.js
+
+Direct to the edge (replace `edge.example.com` and the gateway host if you set `otlpEndpoint`):
+
+```ts
+// next.config.ts
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'nonce-<per-request>'",          // the SDK is bundled by Next; its lazy chunks are same-origin
+  "connect-src 'self' https://edge.example.com https://gateway.example.com", // events, /v1/rum/config, /v1/logs, OTLP traces
+  "worker-src 'self' blob:",                          // session replay compresses in a blob: worker
+  "img-src 'self' data: blob:",
+].join("; ");
+export default { headers: async () => [{ source: "/:path*", headers: [{ key: "Content-Security-Policy", value: csp }] }] };
+```
+
+Through the same-origin tunnel (below) nothing third-party is needed: `connect-src 'self'` covers events, config,
+logs and traces. Replay still needs `worker-src blob:` (omit it if replay is off).
+
+### Ad blockers: same-origin tunnel
+
+Filter lists block third-party telemetry hosts. Point `endpoint` at a path on your own origin and forward it
+server-side. A relative `endpoint` works for events, config, logs, traces (`otlpEndpoint` defaults to `endpoint`),
+replay and feedback; requests to it are never instrumented or reported.
+
+```ts
+// app/api/wt/[...path]/route.ts  (Next app router)
+import { tunnelHandler } from "@watchtowerobservability/node/next";
+export const { GET, POST } = tunnelHandler({ endpoint: process.env.WT_EDGE_URL! });
+```
+
+```ts
+init({ publishableKey: "wtp_...", endpoint: "/api/wt", service: "web" });
+```
+
+`tunnelHandler` is the route handler exported by `@watchtowerobservability/node/next`; see that package for its
+options. Without a tunnel route handler the page gets 404s on `/api/wt/v1/rum/events`.
+
+### URL scrubbing
+
+Every URL the SDK reports (the page URL in each batch and its referrer, `url` on views, navs, resources and
+vitals, `http.url`, `url.full`, `url.path` and `url.query` on fetch/XHR spans, `page.url` on page-load spans) loses its
+query string and fragment, and path segments that look like secrets become `:redacted`: UUIDs, segments of 24 or more
+characters, and segments of 10 or more characters that contain both a letter and a digit (build assets such as
+`app.3f2a1b9c.js` are left alone). Stack-frame script URLs keep their path (source maps and debug ids match on it) and
+lose only the query. Set `urlScrubbing: false` to send paths and queries as they are (the fragment is still dropped).
+`beforeSend` can still scrub more.
+
+### Router adapters and route names
+
+Next app router: `useNextRouteTracking(usePathname(), useParams())` (from `@watchtowerobservability/browser/next`).
+Views, navs and vitals are named by the pattern (`/gallery/:typeId`). The hook runs after hydration and after the
+router commits, so once it is mounted the first view and each navigation wait for it (at most 300 ms, or until the page
+hides) and then report the pattern; without an adapter the first view is sent after the same 300 ms with the
+normalised path (`/users/:id` for numeric and UUID segments).
+
 ## Consent
 
 GDPR sites can load the SDK before consent and start it later:
@@ -72,6 +128,26 @@ cmp.onWithdraw(() => wt.revokeConsent()); // stops, drops queued events and logs
 With `consent: "pending"` nothing runs and nothing is sent (no session, no config request) until
 `grantConsent()`. Calls made before the grant are dropped, not queued. `revokeConsent()` also works on a
 client started without `consent`; a later `grantConsent()` starts a new session.
+
+### Cookie Munch
+
+```ts
+import { cookieMunchConsent } from "@watchtowerobservability/browser/consent";
+const wt = init({ publishableKey: "wtp_...", endpoint: "...", service: "web", consent: "pending" });
+cookieMunchConsent(wt, { rum: "statistics", replay: "statistics" }); // returns a function that detaches it
+```
+
+It listens to `CookieMunchOnConsentReady` / `CookieMunchOnChange` (and reads `CookieMunch.consent` at once when the
+visitor has already decided; `hasResponse` is false before that and is never read as a decline). `rum` calls
+`grantConsent()` or `revokeConsent()`; `replay` stops or restarts session replay while RUM stays on. Categories:
+`statistics`, `marketing`, `preferences`; both default to `statistics`. `grantConsent()` is idempotent: a second call
+while granted does not start a new session.
+
+### Lucida
+
+When the Lucida browser SDK is on the page its session id is added to every batch as `lucida.session_id`. Pass the
+client to link it without a global: `init({ ..., lucida: lucidaClient })` (any object with `getSessionId()`); it is
+used before `globalThis.lucida`.
 
 ## Source maps
 

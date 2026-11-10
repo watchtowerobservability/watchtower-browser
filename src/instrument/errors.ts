@@ -1,4 +1,4 @@
-import { scrubUrl, type Ctx, type Uninstall } from "./ctx";
+import { scrubScriptUrl, scrubUrl, type Ctx, type Uninstall } from "./ctx";
 
 export interface Frame {
   filename: string;
@@ -51,7 +51,11 @@ export function installErrors(ctx: Ctx): Uninstall {
   const seen = new Map<string, number>();
 
   const report = (type: string, message: string, stack: string | undefined, handled: boolean, mechanism: string): void => {
-    const frames = stack ? parseStack(stack) : [];
+    const raw = stack ? parseStack(stack) : [];
+    const ids = debugIdsFor(raw);
+    const frames = raw.map((f) => ({ ...f, filename: scrubScriptUrl(f.filename) }));
+    const debugIds: Record<string, string> = {};
+    for (const [f, id] of Object.entries(ids)) debugIds[scrubScriptUrl(f)] = id;
     const top = frames[frames.length - 1];
     const key = `${type}|${message}|${top ? `${top.filename}:${top.lineno}:${top.colno}` : ""}`;
     const now = Date.now();
@@ -64,7 +68,7 @@ export function installErrors(ctx: Ctx): Uninstall {
       handled,
       mechanism,
       frames: JSON.stringify(frames),
-      debug_ids: JSON.stringify(debugIdsFor(frames)),
+      debug_ids: JSON.stringify(debugIds),
     };
     if (ctx.cfg.release) attrs.release = ctx.cfg.release;
     ctx.emit("error", type, { attrs });
