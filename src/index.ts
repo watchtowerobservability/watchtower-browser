@@ -191,8 +191,12 @@ function build(cfg: WatchtowerConfig): Built {
   const fire = (k: "error" | "vital", payload: WtErrorEvent | WtVital): void => {
     for (const cb of [...(hooks[k] as Set<(p: unknown) => void>)]) safe(cb, undefined, cfg.debug)(payload);
   };
-  // an explicit setAttribute("lucida.session_id") wins over the Lucida client / global
-  const lucida = (): Attrs => ({ ...lucidaAttrs(cfg.lucida), ...(attrs["lucida.session_id"] ? { "lucida.session_id": attrs["lucida.session_id"] } : {}) });
+  // an explicit setAttribute("lucida.session_id" | "lucida.distinct_id") wins over the Lucida client / global
+  const lucida = (): Attrs => {
+    const l = lucidaAttrs(cfg.lucida);
+    for (const k of ["lucida.session_id", "lucida.distinct_id"]) if (attrs[k]) l[k] = attrs[k]!;
+    return l;
+  };
 
   const rate = (): number => remote.sample_rate ?? cfg.sampleRate ?? 1;
   const errRate = (): number => remote.error_sample_rate ?? cfg.errorSampleRate ?? 1;

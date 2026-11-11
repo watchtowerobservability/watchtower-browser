@@ -33,6 +33,13 @@ describe("lucida link", () => {
     expect(lucidaAttrs()).toEqual({});
   });
 
+  it("lucida_distinct_id_attached_when_present", async () => {
+    (globalThis as any).lucida = { getSessionId: () => "ls1", getDistinctId: () => "u-7" };
+    const { lucidaAttrs } = await import("./lucida");
+    expect(lucidaAttrs()).toEqual({ "lucida.session_id": "ls1", "lucida.distinct_id": "u-7" });
+    delete (globalThis as any).lucida;
+  });
+
   it("init_lucida_client_wins_over_the_global", async () => {
     (globalThis as any).lucida = { getSessionId: () => "global" };
     const { lucidaAttrs } = await import("./lucida");

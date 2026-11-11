@@ -8,7 +8,7 @@
 npm install @watchtowerobservability/browser
 ```
 
-The package is on public npm (with provenance); no token is needed.
+The package is on public npm, published from GitHub Actions by npm trusted publishing with provenance (`npm audit signatures` verifies it); no token is needed to install.
 
 Browser SDK core: init, session, batching transport, remote config, PostHog link.
 

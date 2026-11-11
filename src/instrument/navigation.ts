@@ -1,20 +1,27 @@
 import { normalizeRoute, scrubUrl, type Ctx, type NavInfo, type Uninstall } from "./ctx";
 
-let template: string | undefined;
+// The adapters and the instrument ship as separate bundles (dist/adapters, dist/instrument), each with its own
+// copy of this module, so the route lives on one global object both copies share (W-30: module-level state split).
+type RouteState = { template: string | undefined; adapter: boolean; waiting: Set<() => void> };
+const KEY = Symbol.for("watchtower.route");
+const state: RouteState = ((globalThis as Record<symbol, RouteState | undefined>)[KEY] ??= {
+  template: undefined,
+  adapter: false,
+  waiting: new Set(),
+});
 
 /** Router adapters (B4) set the route template (`/users/:id`); undefined falls back to the URL path. */
 export function setRoute(t: string | undefined): void {
-  template = t;
-  adapter = t !== undefined;
-  if (!adapter) return;
-  for (const f of [...waiting]) f();
+  state.template = t;
+  state.adapter = t !== undefined;
+  if (!state.adapter) return;
+  for (const f of [...state.waiting]) f();
 }
 
 // An adapter's hook runs after the router has committed (and, on first load, after hydration), later than
 // the History call or the instrument's install. So once an adapter is in use, views and navs wait for its
 // `setRoute` (or SETTLE_MS) to report the pattern, not the concrete URL path.
-let adapter = false;
-const waiting = new Set<() => void>();
+const waiting = state.waiting;
 const SETTLE_MS = 300;
 function whenRouteSettles(cb: () => void, wait: boolean, mine: Set<() => void>): void {
   if (!wait) return cb();
@@ -30,7 +37,7 @@ function whenRouteSettles(cb: () => void, wait: boolean, mine: Set<() => void>):
   (timer as { unref?: () => void }).unref?.();
 }
 
-export const currentRoute = (): string => template ?? normalizeRoute(location.pathname);
+export const currentRoute = (): string => state.template ?? normalizeRoute(location.pathname);
 
 /** Both rAFs: the first runs before the next paint, the second after it. */
 const afterPaint = (cb: () => void): void =>
@@ -54,7 +61,7 @@ export function installNavigation(ctx: Ctx, listeners: Array<(n: NavInfo) => voi
 
   // first load: wait for the adapter's hook unless it already ran
   const pending = new Set<() => void>();
-  whenRouteSettles(() => view((route = currentRoute()), undefined, undefined, undefined), template === undefined, pending);
+  whenRouteSettles(() => view((route = currentRoute()), undefined, undefined, undefined), state.template === undefined, pending);
 
   const changed = (trigger: string): void => {
     if (location.href === lastHref) return;
@@ -69,7 +76,7 @@ export function installNavigation(ctx: Ctx, listeners: Array<(n: NavInfo) => voi
       ctx.emit("nav", route, { attrs: { route, previous_route: previous, trigger, url } });
       listeners.forEach((f) => f({ route, previous }));
       afterPaint(() => view(route, performance.now() - t0, previous, prevMs));
-    }, adapter, pending);
+    }, state.adapter, pending);
   };
 
   const h = history;

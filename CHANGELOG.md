@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- **Fix: router adapters had no effect in 0.5.0** (`useNextRouteTracking` and the React, Vue, Angular and Svelte adapters). The adapters and the instrumentation ship as separate bundles, each with its own copy of the route state, so the route the adapter set never reached view names; views stayed concrete URLs (`/gallery/contact`). The route now lives on one shared global. Upgrade to get `/gallery/:typeId`.
+- Lucida distinct id: `init({ lucida })` / `globalThis.lucida` with `getDistinctId()` now also stamps `lucida.distinct_id` (like `lucida.session_id`; `setAttribute("lucida.distinct_id", id)` wins). Watchtower builds Lucida person links from it.
+
 ## 0.5.0
 
 - Event hooks: `client.on("error", cb)` and `client.on("vital", cb)` return an unsubscribe function. `error` gets `{event_id, trace_id?, fingerprint?, message (300 chars), type?, handled, url (no query), ts}` for every captured error (`captureError` is `handled: true`; `window.onerror` and unhandled rejections are `false`); `event_id` is the RUM event `id` ingest stores. `vital` gets `{name, value, rating, navigation_id, url, final}` once per vital per page view, when the page is hidden. Callbacks never throw into the host. Feature-detect with `typeof client.on === "function"` or this version.

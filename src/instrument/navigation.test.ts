@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { trackRoute } from "../adapters/router";
 import { normalizeRoute } from "./ctx";
 import { installNavigation, setRoute } from "./navigation";
@@ -79,5 +79,17 @@ describe("navigation", () => {
     const nav = events.find((e) => e.type === "nav")!;
     expect(nav.name).toBe("/gallery/:typeId");
     expect(nav.attrs.previous_route).toBe("/gallery/:typeId");
+  });
+
+  it("two_bundled_copies_share_the_route", async () => {
+    // dist/adapters and dist/instrument each bundle navigation.ts; the adapter's copy must reach the instrument's (W-30)
+    vi.resetModules();
+    const a = await import("./navigation");
+    vi.resetModules();
+    const b = await import("./navigation");
+    expect(a).not.toBe(b);
+    a.setRoute("/gallery/:typeId");
+    expect(b.currentRoute()).toBe("/gallery/:typeId");
+    a.setRoute(undefined);
   });
 });
