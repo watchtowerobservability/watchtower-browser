@@ -6,10 +6,12 @@ import {
   type RemoteConfig,
   type RumEventV1,
   type WatchtowerConfig,
+  type WtErrorEvent,
+  type WtVital,
 } from "./config";
 import { hashUserId, rand, uuid } from "./ids";
 import { lucidaAttrs } from "./lucida";
-import { scrubUrl, setUrlScrubbing } from "./scrub";
+import { scrubUrl, setUrlScrubbing, stripQuery } from "./scrub";
 import { posthogAttrs, registerSession } from "./posthog";
 import type { Uninstall } from "./instrument/ctx";
 import { makeFlagRecorder } from "./instrument/flags";
@@ -22,6 +24,7 @@ import { idbStore } from "./queue";
 import { Session } from "./session";
 import { Transport, type Envelope } from "./transport";
 
+export type { WtErrorEvent, WtVital } from "./config";
 export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter, StorageConfig } from "./config";
 
 export type { Journey };
@@ -47,6 +50,9 @@ export interface WatchtowerClient {
   event(name: string, attrs?: Attrs): void;
   /** Dynamic probe point: `vars` runs only while an active probe targets `name` (needs `probes.key`). */
   probe(name: string, vars: () => Record<string, unknown>): void;
+  /** Hooks, fired after the SDK's own capture; a throwing callback is swallowed. Returns an unsubscribe function. */
+  on(event: "error", cb: (e: WtErrorEvent) => void): () => void;
+  on(event: "vital", cb: (v: WtVital) => void): () => void;
   stop(): void;
   replay: { start(): void; stop(): void; flush(): Promise<void> };
   sessionId(): string;
@@ -85,6 +91,7 @@ const NOOP_CLIENT: WatchtowerClient = {
   measure: noop,
   event: noop,
   probe: noop,
+  on: () => noop,
   stop: noop,
   replay: { start: noop, stop: noop, flush: () => Promise.resolve() },
   sessionId: () => "",
@@ -109,11 +116,22 @@ function safe<A extends unknown[], R>(fn: (...a: A) => R, dflt: R, debug?: boole
 
 export function init(cfg: WatchtowerConfig): WatchtowerClient {
   try {
-    return gated(cfg.release ? cfg : { ...cfg, release: defaultRelease() });
+    const c = gated(cfg.release ? cfg : { ...cfg, release: defaultRelease() });
+    expose(cfg, c);
+    return c;
   } catch (e) {
     if (cfg?.debug) console.warn("[watchtower] init failed", e);
     return NOOP_CLIENT;
   }
+}
+
+/** `exposeGlobal`: `globalThis[name] = client` and a `watchtower:ready` event; on by default only in the script build. */
+function expose(cfg: WatchtowerConfig, client: WatchtowerClient): void {
+  const v = cfg.exposeGlobal ?? __WT_IIFE__;
+  const name = typeof v === "string" ? v : v ? "watchtower" : "";
+  if (!name) return;
+  (globalThis as Record<string, unknown>)[name] = client;
+  if (typeof window !== "undefined" && typeof Event === "function") window.dispatchEvent(new Event("watchtower:ready"));
 }
 
 type Built = { client: WatchtowerClient; revoke: () => void };
@@ -168,6 +186,13 @@ function build(cfg: WatchtowerConfig): Built {
   let paused = false;
   let lastErrorId: string | undefined;
   let onError: (() => void) | undefined;
+  let activeSpan: { trace_id: string; span_id: string } | undefined;
+  const hooks = { error: new Set<(e: WtErrorEvent) => void>(), vital: new Set<(v: WtVital) => void>() };
+  const fire = (k: "error" | "vital", payload: WtErrorEvent | WtVital): void => {
+    for (const cb of [...(hooks[k] as Set<(p: unknown) => void>)]) safe(cb, undefined, cfg.debug)(payload);
+  };
+  // an explicit setAttribute("lucida.session_id") wins over the Lucida client / global
+  const lucida = (): Attrs => ({ ...lucidaAttrs(cfg.lucida), ...(attrs["lucida.session_id"] ? { "lucida.session_id": attrs["lucida.session_id"] } : {}) });
 
   const rate = (): number => remote.sample_rate ?? cfg.sampleRate ?? 1;
   const errRate = (): number => remote.error_sample_rate ?? cfg.errorSampleRate ?? 1;
@@ -184,7 +209,7 @@ function build(cfg: WatchtowerConfig): Built {
       dpr: window.devicePixelRatio,
     },
     user: { id_hash: userHash },
-    attrs: { ...attrs, ...posthogAttrs(), ...lucidaAttrs(cfg.lucida), "wt.sample_rate": rate() },
+    attrs: { ...attrs, ...posthogAttrs(), ...lucida(), "wt.sample_rate": rate() },
   });
 
   const transport = new Transport({
@@ -202,12 +227,18 @@ function build(cfg: WatchtowerConfig): Built {
     if (stopped || paused || !remote.rum_enabled) return;
     if (!session.sampled(rate()) && !(type === "error" && rand() < errRate())) return;
     let e: RumEventV1 | null = { id: uuid(), ts_ns: Date.now() * 1e6, type, name, attrs: {}, ...extra };
+    if (type === "error") e.attrs = { ...lucida(), ...e.attrs };
     if (cfg.beforeSend) e = cfg.beforeSend(e);
     if (!e) return;
     transport.push(e);
     if (type === "error") {
       lastErrorId = e.id;
       onError?.();
+      // the event `id` is what ingest stores as the event id
+      fire("error", {
+        event_id: e.id, trace_id: e.trace_id, message: String(e.attrs.message ?? "").slice(0, 300), type: e.name,
+        handled: e.attrs.handled === true, url: stripQuery(location.href), ts: Math.round(e.ts_ns / 1e6),
+      });
     }
   };
 
@@ -225,7 +256,7 @@ function build(cfg: WatchtowerConfig): Built {
     if (cfg.beforeSend) e = cfg.beforeSend(e);
     if (!e) return;
     const { message: m, "log.level": lvl, ...rest } = e.attrs;
-    logs.push((lvl ?? level) as LogLevel, String(m ?? ""), { ...attrs, ...posthogAttrs(), "session.id": session.id(), ...rest }, span);
+    logs.push((lvl ?? level) as LogLevel, String(m ?? ""), { ...attrs, ...posthogAttrs(), "session.id": session.id(), ...lucida(), ...rest }, span);
   };
 
   const hashUser = (id: string | undefined): Promise<void> =>
@@ -313,7 +344,9 @@ function build(cfg: WatchtowerConfig): Built {
     .then(async () => {
       if (stopped || !remote.rum_enabled) return;
       const mod = await chunk(cfg.instrumentUrl, "instrument/index.js", () => import("./instrument/index.js"));
-      const u = await mod.install({ cfg, emit, log, sessionId: () => session.id(), extraAttrs: posthogAttrs,
+      const u = await mod.install({ cfg, emit, log, sessionId: () => session.id(), extraAttrs: () => ({ ...posthogAttrs(), ...lucida() }),
+        onVital: (v) => fire("vital", v),
+        onSpan: (s) => void (activeSpan = s),
         profilingEnabled: () => remote.profiling?.enabled ?? cfg.profiling === true,
         setAttribute: (k, v) => void (attrs[k] = v),
       });
@@ -370,6 +403,7 @@ function build(cfg: WatchtowerConfig): Built {
       const e = err instanceof Error ? err : new Error(String(err));
       void replayReady.then((h) => h?.trigger());
       emit("error", e.name, {
+        ...(activeSpan ? activeSpan : {}),
         attrs: {
           ...ctx,
           message: e.message.slice(0, 1024),
@@ -398,6 +432,12 @@ function build(cfg: WatchtowerConfig): Built {
     }, undefined, d),
     event: safe((name: string, at?: Attrs) => emit("action", String(name).slice(0, 128), { attrs: { ...at, "wt.kind": "event" } }), undefined, d),
     probe,
+    on: ((event: "error" | "vital", cb: (x: never) => void): (() => void) => {
+      const set = hooks[event] as Set<unknown> | undefined;
+      if (!set || typeof cb !== "function") return noop;
+      set.add(cb);
+      return () => void set.delete(cb);
+    }) as WatchtowerClient["on"],
     stop,
     replay: {
       start: safe(() => void replayReady.then((h) => h?.start()), undefined, d),

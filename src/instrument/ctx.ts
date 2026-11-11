@@ -1,4 +1,4 @@
-import type { Attrs, Matcher, RumEventV1, WatchtowerConfig } from "../config";
+import type { Attrs, Matcher, RumEventV1, WatchtowerConfig, WtVital } from "../config";
 import type { LogLevel } from "../logs";
 
 export interface NetInfo {
@@ -28,6 +28,8 @@ export interface Ctx {
   /** fetch/XHR outcomes keyed by scrubbed URL, filled by tracing, read by resources */
   net: Map<string, NetInfo>;
   extraAttrs?(): Attrs;
+  /** the `vital` hook: a final value, once per vital per page view */
+  onVital?(v: WtVital): void;
 }
 
 export type Uninstall = () => void;

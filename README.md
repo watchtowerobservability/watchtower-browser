@@ -148,6 +148,33 @@ while granted does not start a new session.
 When the Lucida browser SDK is on the page its session id is added to every batch as `lucida.session_id`. Pass the
 client to link it without a global: `init({ ..., lucida: lucidaClient })` (any object with `getSessionId()`); it is
 used before `globalThis.lucida`.
+`client.setAttribute("lucida.session_id", id)` does the same and wins over the client. The id is sent on the batch
+`attrs` (the RUM session), on every error event's `attrs`, on every span and log record as `lucida.session_id`, and as
+W3C baggage `lucida.session_id=<id>` on fetch/XHR requests that get a `traceparent` (same `propagateTo` rules).
+
+### Hooks
+
+```ts
+const off = wt.on("error", (e) => {}); // { event_id, trace_id?, fingerprint?, message, type?, handled, url, ts }
+wt.on("vital", (v) => {});             // { name, value, rating, navigation_id, url, final }
+off();                                 // unsubscribe
+```
+
+- `error` fires after the SDK has queued the event, for `captureError` (`handled: true`), `window.onerror`,
+  unhandled rejections, resource and CSP errors (`handled: false`). `event_id` is the id of the event sent to ingest
+  (`events[].id`), so it resolves to the stored error. `message` is capped at 300 chars; `url` has no query string.
+  Errors dropped by sampling or `beforeSend` do not fire. `ts` is epoch ms.
+- `vital` fires once per vital (`LCP`, `INP`, `CLS`, `FCP`, `TTFB`) per page view, with `final: true`, when the page
+  is hidden (`visibilitychange` or `pagehide`). `rating` uses the web-vitals thresholds; `navigation_id` is one id
+  per page view (a bfcache restore starts a new one).
+- A throwing callback is swallowed. Hooks registered before `grantConsent()` are not kept (the client is a no-op
+  until consent).
+
+### `exposeGlobal`
+
+`init({ exposeGlobal: true })` (or a name) sets `globalThis.watchtower` to the client and dispatches
+`watchtower:ready` on `window`. It is on by default in the script build and off for npm/ESM; `false` turns the
+script default off.
 
 ## Source maps
 

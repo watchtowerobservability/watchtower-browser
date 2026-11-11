@@ -19,6 +19,9 @@ export interface InstallOpts {
   /** local `profiling` option, overridden by remote config; read live */
   profilingEnabled?(): boolean;
   setAttribute?(k: string, v: string): void;
+  onVital?(v: import("../config").WtVital): void;
+  /** called whenever tracing sets the active view span */
+  onSpan?(s: { trace_id: string; span_id: string } | undefined): void;
 }
 
 const absolute = (u: string): string => {
@@ -43,6 +46,7 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
     cfg,
     sessionId: o.sessionId,
     extraAttrs: o.extraAttrs,
+    onVital: o.onVital,
     route: currentRoute,
     isOwn: (u) => own.some((p) => u.startsWith(p)),
     onNav: (cb) => void listeners.push(cb),
@@ -55,6 +59,8 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
         ...(extra.trace_id ? {} : { trace_id: ctx.span?.trace_id, span_id: ctx.span?.span_id }),
       }),
   };
+  let span: Ctx["span"];
+  Object.defineProperty(ctx, "span", { get: () => span, set: (s: Ctx["span"]) => { span = s; o.onSpan?.(s); } });
   const undo: Uninstall[] = [];
   const add = (f: () => Uninstall | undefined): void => {
     try {

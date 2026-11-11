@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Event hooks: `client.on("error", cb)` and `client.on("vital", cb)` return an unsubscribe function. `error` gets `{event_id, trace_id?, fingerprint?, message (300 chars), type?, handled, url (no query), ts}` for every captured error (`captureError` is `handled: true`; `window.onerror` and unhandled rejections are `false`); `event_id` is the RUM event `id` ingest stores. `vital` gets `{name, value, rating, navigation_id, url, final}` once per vital per page view, when the page is hidden. Callbacks never throw into the host. Feature-detect with `typeof client.on === "function"` or this version.
+- `exposeGlobal: true | "<name>"`: sets `globalThis[name]` (default `watchtower`) and dispatches `watchtower:ready` on window. On by default in the script build (`wt.min.js`), off for npm/ESM.
+- Lucida session id: `setAttribute("lucida.session_id", id)` (or `init({ lucida })`) now also stamps error events, logs and spans as `lucida.session_id`, besides the batch attrs, and is sent as W3C baggage `lucida.session_id=<id>` on requests that get a `traceparent` (`propagateTo`).
+
 ## 0.4.0
 
 - URL scrubbing is on by default: reported URLs (page, referrer, view/nav/resource/vital `url`, fetch/XHR `http.url`/`url.full`/`url.path`, `url.query` removed) lose query and fragment, and secret-looking path segments (UUIDs, >= 24 chars, >= 10 chars with a letter and a digit) become `:redacted`. Stack-frame script URLs lose only their query. `urlScrubbing: false` opts out.

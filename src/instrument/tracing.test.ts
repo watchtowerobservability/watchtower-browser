@@ -4,20 +4,26 @@ import { makePropagator } from "./tracing";
 import { baseCfg, mkCtx } from "./testutil";
 
 /** Run the propagator the way the fetch instrumentation does: span in context, carrier = headers. */
-function inject(url: string, propagateTo?: Array<string | RegExp>): Record<string, string> {
+function inject(url: string, propagateTo?: Array<string | RegExp>, lucida?: string): Record<string, string> {
   const { c } = mkCtx({ propagateTo });
   const span = {
     spanContext: () => ({ traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 }),
     attributes: { "http.url": url },
   } as unknown as Span;
   const carrier: Record<string, string> = {};
-  makePropagator(c.cfg, c.isOwn).inject(trace.setSpan(ROOT_CONTEXT, span), carrier, {
+  makePropagator(c.cfg, c.isOwn, () => lucida).inject(trace.setSpan(ROOT_CONTEXT, span), carrier, {
     set: (cr: Record<string, string>, k, v) => void (cr[k] = v),
   });
   return carrier;
 }
 
 describe("traceparent", () => {
+  it("baggage_carries_lucida_session_only_where_traceparent_goes", () => {
+    expect(inject("https://api.mine.test/x", ["https://api.mine.test"], "ls 1").baggage).toBe("lucida.session_id=ls%201");
+    expect(inject("https://api.other.com/x", ["https://api.mine.test"], "ls1").baggage).toBeUndefined();
+    expect(inject("https://api.mine.test/x", ["https://api.mine.test"]).baggage).toBeUndefined();
+  });
+
   it("traceparent_not_sent_to_unlisted_origin", () => {
     const allow = ["https://api.mine.test"];
     expect(inject("https://api.other.com/v1/x", allow).traceparent).toBeUndefined();

@@ -14,6 +14,28 @@ export interface RumEventV1 {
   span_id?: string;
 }
 
+/** Passed to `client.on("error", cb)`. `event_id` is the RUM event id ingest stores. */
+export interface WtErrorEvent {
+  event_id: string;
+  trace_id?: string;
+  fingerprint?: string;
+  message: string;
+  type?: string;
+  handled: boolean;
+  url: string;
+  ts: number;
+}
+
+/** Passed to `client.on("vital", cb)`. */
+export interface WtVital {
+  name: "LCP" | "INP" | "CLS" | "FCP" | "TTFB";
+  value: number;
+  rating: "good" | "needs-improvement" | "poor";
+  navigation_id: string;
+  url: string;
+  final: boolean;
+}
+
 import type { ReplayConfig } from "./replay/config";
 import type { AssistConfig } from "./assist";
 export type { ReplayConfig };
@@ -72,6 +94,9 @@ export interface WatchtowerConfig {
   consent?: "pending" | "granted";
   /** opt-in: keep an anonymous id in localStorage (default off) */
   persistAnonId?: boolean;
+  /** set `globalThis[name]` to the client and dispatch `watchtower:ready` on window. `true` = "watchtower".
+   * Default: on for the script (IIFE) build, off for npm/ESM. `false` turns the script default off. */
+  exposeGlobal?: boolean | string;
   debug?: boolean;
 }
 

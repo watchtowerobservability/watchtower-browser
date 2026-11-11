@@ -25,16 +25,19 @@ const spanUrl = (span: Span): string => {
  * The instrumentations inject for every same-origin request and any CORS URL we allow; this
  * propagator is the single decision point, so `propagateTo` is the only way a header is sent.
  */
-export function makePropagator(cfg: WatchtowerConfig, isOwn: (u: string) => boolean): TextMapPropagator {
+export function makePropagator(cfg: WatchtowerConfig, isOwn: (u: string) => boolean, lucidaId?: () => string | undefined): TextMapPropagator {
   return {
     inject(context, carrier, setter) {
       const span = trace.getSpan(context);
       if (!span || !shouldPropagate(spanUrl(span), cfg, isOwn)) return;
       const sc = span.spanContext();
       setter.set(carrier, "traceparent", `00-${sc.traceId}-${sc.spanId}-0${sc.traceFlags & 1}`);
+      // same allow-list as traceparent; replaces any baggage header the host set on this request
+      const l = lucidaId?.();
+      if (l) setter.set(carrier, "baggage", `lucida.session_id=${encodeURIComponent(l)}`);
     },
     extract: (context) => context,
-    fields: () => ["traceparent"],
+    fields: () => ["traceparent", "baggage"],
   };
 }
 
@@ -89,7 +92,7 @@ export function installTracing(ctx: Ctx): Uninstall {
       new BatchSpanProcessor(exporter),
     ],
   });
-  provider.register({ propagator: makePropagator(cfg, ctx.isOwn), contextManager: cm });
+  provider.register({ propagator: makePropagator(cfg, ctx.isOwn, () => String(ctx.extraAttrs?.()["lucida.session_id"] ?? "") || undefined), contextManager: cm });
 
   const record = (span: Span, status: number | undefined, failed: boolean): void => {
     const url = scrubUrl(spanUrl(span));
