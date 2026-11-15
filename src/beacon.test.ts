@@ -26,3 +26,17 @@ it("beacon_sends_once_on_hide_with_the_rum_batch_shape_and_caps_errors", async (
   expect(b.events.some((e: { name: string }) => e.name === "CLS")).toBe(true);
   vi.unstubAllGlobals();
 });
+
+it("beacon_sends_nothing_while_consent_is_pending_or_denied_until_granted", () => {
+  const sent: string[] = [];
+  vi.stubGlobal("navigator", { ...navigator, sendBeacon: (u: string) => (sent.push(u), true) });
+  const h = init({ key: "wtp_k", endpoint: "https://e.example", consent: "pending" });
+  window.dispatchEvent(new Event("pagehide"));
+  h.revokeConsent();
+  window.dispatchEvent(new Event("pagehide"));
+  expect(sent).toHaveLength(0);
+  h.grantConsent();
+  window.dispatchEvent(new Event("pagehide"));
+  expect(sent).toHaveLength(1);
+  vi.unstubAllGlobals();
+});

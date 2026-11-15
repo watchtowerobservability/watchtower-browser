@@ -1,12 +1,22 @@
 # Changelog
 
+## 0.5.6 (2026-11-15)
+
+- Behaviour change (privacy): with `userActions` on, an action with no `data-wt-action` is named by a text-free selector (tag, id, up to 3 classes, `data-testid`, or `name`), never by the element's text, which could hold names and emails on admin screens. New option `actionNameFromText: true` restores text names (<= 128 chars). `data-wt-action` still wins.
+- New `@watchtowerobservability/browser/lite` entry (`dist/lite.js`): `init` and the same API, with no references to the replay, assist, feedback or probes chunks. Use it in single-file builds (Vite inlining dynamic imports) to avoid pulling replay (about 65 KB gzipped); those options are no-ops there.
+- `cookieMunchConsent` is exported from the main entry and so is on the `wt.min.js` global (`Watchtower.cookieMunchConsent(client)`); it was only in the ESM `/consent` entry.
+- The `/beacon` entry and `consent: "granted" | "pending" | "denied"` shipped in 0.5.5 (see below).
+- Browser logs survive failures: a 429 or 5xx retries with backoff (honouring `Retry-After`), a network failure parks the batch in IndexedDB until the next successful send. Other 4xx responses still drop the batch and warn once.
+- Opt-in `storage` option: slow or failed IndexedDB, Cache Storage and localStorage operations as `db` events (main-thread work flagged `db.main_thread`), quota and per-store sizes as `storage` events. Lazy chunk; the core bundle does not grow.
+- `@watchtowerobservability/browser/storage`: `instrumentSqlJs(db)` and `instrumentWaSqlite(sqlite3)` (operation and table only, never statement text).
+
 ## 0.5.5 (2026-11-15)
 
 - Privacy: `revokeConsent()` now aborts in-flight event and log sends, makes the transport and log shipper inert (a send that fails after the revoke is not parked offline, the offline restore is skipped), and deletes the `wt-offline` and `wt-offline-logs` IndexedDB databases with `indexedDB.deleteDatabase` instead of only emptying them (also when consent was still pending). No fetch or `sendBeacon` happens after the revoke, including on `pagehide` / `visibilitychange`.
 - `consent: "pending"` now holds up to 100 data calls (`captureError`, `event`, `measure`, `log`, `flag`, `setUser`, `setAttribute`, `setView`) in memory and replays them on `grantConsent()`; `revokeConsent()` drops them. Before, calls made while pending were dropped.
 - `urlScrubbing` also takes the presets `"strict"` (= `true`), `"pii"` (adds emails, phone numbers, card numbers, IPv4 in path segments) and `"off"` (= `false`), named like the node SDK's `redact`.
 - README documents the `propagateTo` contract (`traceparent`, `baggage` only with a Lucida session, never `tracestate`; the target's `Access-Control-Allow-Headers`).
-- New `@watchtowerobservability/browser/beacon` entry (`dist/beacon.js`, `dist/beacon.min.js`, about 1.5 KB gzipped): LCP, CLS, INP (approximated) and up to 10 errors, one `sendBeacon` when the page is hidden. See the README.
+- New `@watchtowerobservability/browser/beacon` entry (`dist/beacon.js`, `dist/beacon.min.js`, about 1.5 KB gzipped): LCP, CLS, INP (approximated) and up to 10 errors, one `sendBeacon` when the page is hidden. See the README. `init()` returns `{ grantConsent, revokeConsent }` and takes `consent: "granted" | "pending" | "denied"` (default `granted`): unless granted nothing is sent.
 - `persistAnonId: true` is now implemented: an anonymous UUID in `localStorage` (`wt.anon`, sent as the `wt.anon_id` attribute), removed by `revokeConsent()`. Default stays off. Declared in the storage declaration.
 - The build now empties `dist/` first; older builds left stale hashed chunks (`instrument/tracing-*.js`, `web-vitals.attribution-*.js`) that were published (about 81 KB each).
 - `package.json` declares `"license": "Apache-2.0"`.
@@ -51,12 +61,6 @@
 - Lazy chunks load through static imports by default, so webpack 5 / Next 15 build without the "Critical dependency" warning and send events; an explicit `*Url` option or the IIFE build still loads by URL (`webpackIgnore`).
 - Types ship (`dist/*.d.ts`, `types` conditions in `exports`); `./package.json` is exported.
 - `SDK.version` follows package.json. The "Uncaught " prefix no longer doubles up in error titles.
-
-## Unreleased
-
-- Browser logs survive failures: a 429 or 5xx retries with backoff (honouring `Retry-After`), a network failure parks the batch in IndexedDB until the next successful send. Other 4xx responses still drop the batch and warn once.
-- Opt-in `storage` option: slow or failed IndexedDB, Cache Storage and localStorage operations as `db` events (main-thread work flagged `db.main_thread`), quota and per-store sizes as `storage` events. Lazy chunk; the core bundle does not grow.
-- `@watchtowerobservability/browser/storage`: `instrumentSqlJs(db)` and `instrumentWaSqlite(sqlite3)` (operation and table only, never statement text).
 
 ## 0.1.0
 

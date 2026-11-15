@@ -62,6 +62,10 @@ output, not `wt.min.js` alone: the core loads its features lazily from files nex
 | `probes.js` | `probes.key` is set |
 | `feedback.js` | the first `feedback` / `feedbackWidget` call |
 
+**Single-file builds (Vite inlining dynamic imports):** import `@watchtowerobservability/browser/lite` instead of the main entry. It has the same API but no reference to `replay.js`, `assist.js`, `feedback.js` or `probes.js`, so the bundle does not grow by about 65 KB gzipped for replay. `replay`, `assist`, `feedback` and `probes` do nothing there.
+
+**User actions:** an automatic action is named `data-wt-action` if set, else a selector without text (tag, id, classes, `data-testid`, `name`). Set `actionNameFromText: true` to use the element's text instead (it can contain personal data). In the script build, `Watchtower.cookieMunchConsent(client)` is available.
+
 Keep the directory layout (`instrument/` beside `wt.min.js`) and the `.map` files if you want
 readable stacks. Chunks resolve relative to the script that loaded the core (the `<script src>`
 of `wt.min.js`, or `import.meta.url` for ESM), so `/wt/wt.min.js` loads `/wt/instrument/index.js`.
@@ -214,7 +218,18 @@ import { init } from "@watchtowerobservability/browser/beacon";
 init({ key: "wtp_...", endpoint: "https://edge.watchtowerops.net", service: "web", release: "abc123" });
 ```
 
-It watches LCP, CLS and INP and the first 10 uncaught errors and unhandled rejections (message and first stack line), then sends one `navigator.sendBeacon` (fallback `fetch` with `keepalive`) when the page is hidden, to `POST <endpoint>/v1/rum/events` in the same batch format as the full SDK. Approximations: CLS is the plain sum of shifts without recent input (not the session-window maximum), and INP is the longest event duration among interactions (web-vitals reports a high percentile), so it can read higher on busy pages. Errors carry no parsed frames, so they are not symbolicated.
+```ts
+const beacon = init({ key: "wtp_...", consent: "pending" }); // or "denied"; default "granted"
+beacon.grantConsent(); // later, when the visitor agrees (revokeConsent() stops sending again)
+```
+
+- **Endpoint and key:** `POST <endpoint>/v1/rum/events?k=<key>` (default endpoint `https://edge.watchtowerops.net`). `key` is a publishable RUM key (`wtp_...`), the same kind the full client takes as `publishableKey`; it is public by design, so restrict it with allowed origins.
+- **Requests:** exactly one per page view. When the page is hidden (`visibilitychange` to hidden, or `pagehide`, whichever comes first) it calls `navigator.sendBeacon` with a `text/plain` Blob (no preflight). Only if `sendBeacon` throws or returns false does it make one fallback `fetch` POST with `keepalive`, `Authorization: Bearer <key>` and `Content-Type: application/json`. Nothing is retried or queued.
+- **Payload (JSON):** `{ session_id, sent_at_ns, sdk: {name, version}, app: {service, release}, page: {url, referrer}, device: {ua, viewport: [w, h], dpr}, user: {}, attrs: {}, events: [...] }`. URLs and referrers have query string and fragment removed. `events` holds one `{id, ts_ns, type: "vital", name: "LCP"|"CLS"|"INP", value, attrs: {rating, url}}` per metric seen, plus up to 10 `{type: "error", name: "Error"|"UnhandledRejection", attrs: {message (1 KiB max), stack (first frame, 300 chars max), handled: false}}`. `session_id` is a random per-page-view id: no cookie, no storage, no user identity.
+- **Consent:** `consent` is `"granted"` (default, as in the full client), `"pending"` or `"denied"`. Unless granted, nothing is sent (the metrics are only held in memory); `grantConsent()` / `revokeConsent()` on the returned handle change that, and a page hidden before consent is granted sends nothing for that page view.
+- **Size:** about 1.5 KB gzipped (a test fails above 2 KiB).
+
+Approximations: CLS is the plain sum of shifts without recent input (not the session-window maximum), and INP is the longest event duration among interactions (web-vitals reports a high percentile), so it can read higher on busy pages. Errors carry no parsed frames, so they are not symbolicated.
 
 ## Source maps
 

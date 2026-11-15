@@ -7,12 +7,20 @@ export interface BeaconOptions {
   endpoint?: string;
   service?: string;
   release?: string;
+  /** `granted` (default, like the full client) sends on hide; `pending` and `denied` send nothing until `grantConsent()`. Metrics are kept in memory only. */
+  consent?: "granted" | "pending" | "denied";
+}
+
+export interface BeaconHandle {
+  grantConsent(): void;
+  revokeConsent(): void;
 }
 
 const uuid = (): string => (([1e7] as unknown as string) + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => ((+c ^ (Math.random() * 16) >> (+c / 4)) as number).toString(16));
 const LIM: Record<string, number[]> = { LCP: [2500, 4000], CLS: [0.1, 0.25], INP: [200, 500] };
 
-export function init(o: BeaconOptions): void {
+export function init(o: BeaconOptions): BeaconHandle {
+  let consent = o.consent ?? "granted";
   const w = window;
   const sid = uuid();
   const v: Record<string, number> = { CLS: 0, INP: 0 };
@@ -36,7 +44,7 @@ export function init(o: BeaconOptions): void {
   w.addEventListener("unhandledrejection", (e) => err("UnhandledRejection", e.reason?.message ?? e.reason, e.reason?.stack));
 
   const send = (): void => {
-    if (sent) return;
+    if (sent || consent !== "granted") return;
     sent = true;
     const ts_ns = Date.now() * 1e6;
     const page = location.href.split(/[?#]/)[0]!;
@@ -66,4 +74,5 @@ export function init(o: BeaconOptions): void {
   };
   document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && send());
   w.addEventListener("pagehide", send);
+  return { grantConsent: () => void (consent = "granted"), revokeConsent: () => void (consent = "denied") };
 }

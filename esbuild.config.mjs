@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { buildManifest } from "./manifest.mjs";
-import { define, lazyChunks } from "./esbuild.shared.mjs";
+import { define, lazyChunks, liteChunks } from "./esbuild.shared.mjs";
 import { readFileSync } from "node:fs";
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 // Hashed chunks change name every build: without this, stale ones from older builds pile up in dist/ and get published.
@@ -10,6 +10,8 @@ const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, targ
 await build({ ...common, format: "esm", plugins: [lazyChunks], outfile: "dist/index.js" });
 // iife has no import.meta: lazy chunks resolve next to the script tag that loaded wt.min.js.
 await build({ ...common, format: "iife", plugins: [lazyChunks], banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { ...define, __WT_IIFE__: "true", "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
+// `/lite` entry: init without the replay, assist, feedback and probes chunk references (single-file builds).
+await build({ ...common, entryPoints: ["src/lite.ts"], format: "esm", plugins: [liteChunks, lazyChunks], outfile: "dist/lite.js" });
 // `/beacon` entry: ~1.5 KB RUM beacon (vitals + errors, one sendBeacon), ESM and a script-tag IIFE.
 await build({ ...common, entryPoints: ["src/beacon.ts"], format: "esm", outfile: "dist/beacon.js" });
 await build({ ...common, entryPoints: ["src/beacon.ts"], format: "iife", globalName: "WatchtowerBeacon", sourcemap: false, outfile: "dist/beacon.min.js" });

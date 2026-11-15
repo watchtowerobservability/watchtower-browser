@@ -65,6 +65,10 @@ export interface WatchtowerConfig {
   /** automatic user-action spans: a click, submit or Enter starts a span that parents the fetch/XHR
    * spans it causes (needs otlpEndpoint; default on). Name one with `data-wt-action="checkout"`. */
   userActions?: boolean;
+  /** name an auto action after the clicked element's text (<= 128 chars) when it has no `data-wt-action`.
+   * Default false: names are a selector (tag, id, classes, `data-testid`, `name`), because element text
+   * can hold names and emails. */
+  actionNameFromText?: boolean;
   sampleRate?: number;
   errorSampleRate?: number;
   ignoreUrls?: Matcher[];

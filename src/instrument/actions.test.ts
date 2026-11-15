@@ -37,3 +37,23 @@ it("click_opens_action_that_parents_fetch_spans", () => {
   context.disable();
   btn.remove();
 });
+
+it("action_name_has_no_text_unless_opted_in", () => {
+  const b = document.createElement("button");
+  b.id = "save";
+  b.textContent = "Ada Lovelace";
+  document.body.appendChild(b);
+  const names = (fromText: boolean): string => {
+    const { c, events } = mkCtx();
+    c.cfg.actionNameFromText = fromText;
+    const cm = new ActionContextManager();
+    const ua = installUserActions(c, new WebTracerProvider().getTracer("t"), cm);
+    b.click();
+    vi.advanceTimersByTime(ACTION_IDLE_MS + 1);
+    ua.uninstall();
+    return events[0]!.name;
+  };
+  expect(names(false)).toBe("button#save");
+  expect(names(true)).toBe("Ada Lovelace");
+  b.remove();
+});

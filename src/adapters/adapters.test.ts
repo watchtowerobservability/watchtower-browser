@@ -43,7 +43,8 @@ describe("adapters", () => {
   const docsDir = join(__dirname, "../../../../docs/product/ingest/browser");
   it.skipIf(!existsSync(docsDir))("framework_docs_cover_csp_and_privacy_attrs", () => {
     const dir = docsDir;
-    const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
+    // beacon.md documents the no-SDK beacon (no worker, no masking), not a framework adapter
+    const files = readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "beacon.md");
     expect(files.sort()).toEqual(["angular.md", "cdn.md", "nextjs.md", "react.md", "svelte.md", "vanilla.md", "vue.md"]);
     for (const f of files) {
       const t = readFileSync(join(dir, f), "utf8");

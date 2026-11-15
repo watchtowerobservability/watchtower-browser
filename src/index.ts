@@ -30,6 +30,7 @@ export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter, StorageCo
 
 export type { Journey };
 export type { Feedback, FeedbackWidgetOptions } from "./feedback";
+export { cookieMunchConsent } from "./consent"; // on the `wt.min.js` global too
 export { growthBookAdapter, launchDarklyAdapter, openFeatureHook } from "./instrument/flags";
 
 export interface WatchtowerClient {

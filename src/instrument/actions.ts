@@ -41,8 +41,15 @@ export class ActionContextManager implements ContextManager {
   }
 }
 
-const nameOf = (el: Element): string =>
-  el.closest("[data-wt-action]")?.getAttribute("data-wt-action")?.slice(0, 128) || selectorOf(el, 128);
+/** `data-wt-action`, else a text-free selector (tag, id, classes, `data-testid`, `name`); element text only with `actionNameFromText`. */
+const nameOf = (el: Element, fromText: boolean): string => {
+  const named = el.closest("[data-wt-action]")?.getAttribute("data-wt-action")?.slice(0, 128);
+  if (named) return named;
+  const text = fromText ? (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 128) : "";
+  if (text) return text;
+  const n = el.getAttribute("name");
+  return selectorOf(el, 128) + (n && !el.id ? `[name=${n}]` : "").slice(0, 128);
+};
 
 /**
  * Automatic user-action spans (Faro userActions parity): click, submit or Enter opens a
@@ -80,7 +87,7 @@ export function installUserActions(ctx: Ctx, tracer: Tracer, cm: ActionContextMa
   const begin = (type: string, target: EventTarget | null): void => {
     if (!(target instanceof Element)) return;
     finish(); // a new interaction closes the previous one
-    const name = nameOf(target);
+    const name = nameOf(target, ctx.cfg.actionNameFromText === true);
     const span = tracer.startSpan("user_action", {
       attributes: { "user_action.type": type, "user_action.name": name, "view.route": ctx.route() },
     }, ROOT_CONTEXT);

@@ -5,3 +5,6 @@ const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 export const chunkPaths = { "./replay/index.js": "./replay.js", "./assist.js": "./assist.js", "./probes.js": "./probes.js", "./feedback.js": "./feedback.js", "./instrument/index.js": "./instrument/index.js", "./load-url.js": "./load-url.js" };
 export const lazyChunks = { name: "lazy-chunks", setup(b) { b.onResolve({ filter: /^\.\/(replay\/index|assist|probes|feedback|instrument\/index|load-url)\.js$/ }, (a) => (a.importer.endsWith("src/index.ts") ? { path: chunkPaths[a.path], external: true } : undefined)); } };
 export const define = { __WT_VERSION__: JSON.stringify(version) };
+// `/lite`: replay, assist, feedback and probes resolve to a stub that rejects, so bundlers that inline dynamic imports (Vite single-file) never see those chunks.
+const stub = new URL("./src/lite-stub.ts", import.meta.url).pathname;
+export const liteChunks = { name: "lite-chunks", setup(b) { b.onResolve({ filter: /^\.\/(replay\/index|assist|probes|feedback)\.js$/ }, (a) => (a.importer.endsWith("src/index.ts") ? { path: stub } : undefined)); } };
