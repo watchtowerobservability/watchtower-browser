@@ -20,7 +20,8 @@ import { fetchRemoteConfig } from "./remote_config";
 import type { ReplayHandle } from "./replay";
 import type { MaskLevel } from "./replay/config";
 import { LogShipper, type LogLevel } from "./logs";
-import { idbStore } from "./queue";
+import { chunkFailed } from "./chunk-error";
+import { deleteOfflineDbs, idbStore } from "./queue";
 import { Session } from "./session";
 import { Transport, type Envelope } from "./transport";
 
@@ -72,9 +73,13 @@ declare const __WT_IIFE__: boolean;
  * with `webpackIgnore`/`@vite-ignore` so bundlers leave the expression alone; otherwise the static
  * `stat()` import lets webpack, Next and Vite split and resolve the chunk themselves. */
 function chunk<T>(url: string | undefined, rel: string, stat: () => Promise<T>): Promise<T> {
-  if (url) return (__WT_IIFE__ ? import(/* @vite-ignore */ url) : import("./load-url.js").then((m) => m.loadUrl(url))) as Promise<T>;
-  if (__WT_IIFE__) return import(/* webpackIgnore: true */ /* @vite-ignore */ new URL(rel, import.meta.url).href) as Promise<T>;
-  return stat();
+  const bad = (base: string) => (e: unknown): never => chunkFailed(url ?? rel, base, e);
+  if (url) return ((__WT_IIFE__ ? import(/* @vite-ignore */ url) : import("./load-url.js").then((m) => m.loadUrl(url))) as Promise<T>).catch(bad(url));
+  if (__WT_IIFE__) {
+    const href = new URL(rel, import.meta.url).href;
+    return (import(/* webpackIgnore: true */ /* @vite-ignore */ href) as Promise<T>).catch(bad(new URL(".", href).href));
+  }
+  return stat().catch(bad("the bundler's public path"));
 }
 
 const noop = (): void => undefined;
@@ -136,21 +141,40 @@ function expose(cfg: WatchtowerConfig, client: WatchtowerClient): void {
 
 type Built = { client: WatchtowerClient; revoke: () => void };
 
-/** Consent gate: calls go to the running client, or to the no-op one until consent is granted
- * (calls made before the grant are dropped, not queued). */
+const HELD = new Set<string>(["captureError", "event", "measure", "log", "flag", "setUser", "setAttribute", "setView"]);
+const HELD_MAX = 100;
+
+/** Consent gate: calls go to the running client, or to the no-op one until consent is granted. While consent is
+ * "pending" (never granted, not revoked) up to 100 data calls are held in memory, replayed on `grantConsent()`
+ * and dropped on `revokeConsent()`; after a revoke they are dropped, not held. */
 function gated(cfg: WatchtowerConfig): WatchtowerClient {
   let cur: Built | undefined = cfg.consent === "pending" ? undefined : build(cfg);
+  let held: Array<[keyof WatchtowerClient, unknown[]]> | undefined = cur ? undefined : [];
   const c = (): WatchtowerClient => cur?.client ?? NOOP_CLIENT;
   const out: Record<string, unknown> = {};
   for (const k of Object.keys(NOOP_CLIENT) as Array<keyof WatchtowerClient>) {
-    out[k] = (...a: unknown[]) => (c()[k] as (...x: unknown[]) => unknown)(...a);
+    out[k] = (...a: unknown[]) => {
+      if (!cur && held && HELD.has(k)) {
+        if (held.length < HELD_MAX) held.push([k, a]);
+        return undefined;
+      }
+      return (c()[k] as (...x: unknown[]) => unknown)(...a);
+    };
   }
   out.replay = { start: () => c().replay.start(), stop: () => c().replay.stop(), flush: () => c().replay.flush() };
-  out.grantConsent = safe(() => void (cur ??= build(cfg)), undefined, cfg.debug);
+  out.grantConsent = safe(() => {
+    if (cur) return;
+    cur = build(cfg);
+    const q = held ?? [];
+    held = undefined;
+    for (const [k, a] of q) safe(() => (cur!.client[k] as (...x: unknown[]) => unknown)(...a), undefined, cfg.debug)();
+  }, undefined, cfg.debug);
   out.revokeConsent = safe(() => {
     cur?.revoke();
     cur = undefined;
+    held = undefined;
     new Session().clear();
+    deleteOfflineDbs();
   }, undefined, cfg.debug);
   return out as unknown as WatchtowerClient;
 }
@@ -176,7 +200,7 @@ function activated(): Promise<boolean> {
 
 function build(cfg: WatchtowerConfig): Built {
   setUrlScrubbing(cfg.urlScrubbing);
-  const session = new Session();
+  const session = new Session(undefined, cfg.persistAnonId === true);
   const attrs: Attrs = syntheticAttrs();
   let remote: RemoteConfig = DEFAULT_REMOTE;
   let userHash: string | undefined;
@@ -213,7 +237,7 @@ function build(cfg: WatchtowerConfig): Built {
       dpr: window.devicePixelRatio,
     },
     user: { id_hash: userHash },
-    attrs: { ...attrs, ...posthogAttrs(), ...lucida(), "wt.sample_rate": rate() },
+    attrs: { ...attrs, ...posthogAttrs(), ...lucida(), "wt.sample_rate": rate(), ...(session.anonId() ? { "wt.anon_id": session.anonId()! } : {}) },
   });
 
   const transport = new Transport({
@@ -324,13 +348,16 @@ function build(cfg: WatchtowerConfig): Built {
 
   // Co-browse assist: a lazy chunk, only fetched when `assist.enabled` is set locally.
   let assist: { stop(): void } | undefined;
+  let replayHandle: ReplayHandle | undefined;
+  void replayReady.then((h) => void (replayHandle = h));
   void ready
     .then(async () => {
       if (cfg.assist?.enabled !== true || stopped) return;
       const mod = await chunk(cfg.assist.scriptUrl, "assist.js", () => import("./assist.js"));
       const r = cfg.replay;
       assist = mod.startAssist({
-        cfg: cfg.assist, endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(),
+        cfg: { ...cfg.assist, allowControl: cfg.cobrowse?.allowControl === true || cfg.assist.allowControl === true },
+        resolve: (id) => replayHandle?.node(id) ?? null, endpoint: cfg.endpoint, key: cfg.publishableKey, sessionId: () => session.id(),
         startReplay: () => void replayReady.then((h) => h?.start()),
         mask: () => mod.maskRules(r?.maskLevel, replayRemote(remote).maskLevel, r?.maskTextSelector, r?.blockSelector),
       });

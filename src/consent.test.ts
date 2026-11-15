@@ -25,6 +25,47 @@ describe("consent", () => {
     expect(sessionStorage.getItem("wt.session")).not.toBeNull();
   });
 
+  it("pending_holds_data_calls_and_replays_them_on_grant", async () => {
+    const f = stubFetch();
+    const c = init({ ...cfg, consent: "pending" });
+    c.event("held-one");
+    c.setAttribute("a", "b");
+    c.grantConsent();
+    void c.shutdown();
+    await vi.waitFor(() => expect(JSON.stringify(f.events())).toContain("held-one"), { timeout: 3000 });
+  });
+
+  it("pending_queue_is_bounded_and_dropped_on_revoke", async () => {
+    const f = stubFetch();
+    const c = init({ ...cfg, consent: "pending" });
+    for (let i = 0; i < 150; i++) c.event(`e${i}`);
+    c.revokeConsent();
+    c.grantConsent();
+    void c.shutdown();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(JSON.stringify(f.events())).not.toContain('"e0"');
+  });
+
+  it("revoke_never_sends_after_and_deletes_both_offline_databases", async () => {
+    const f = stubFetch();
+    const beacon = vi.fn(() => true);
+    const del = vi.fn();
+    vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
+    vi.stubGlobal("indexedDB", { deleteDatabase: del, open: () => { throw new Error("no idb"); } });
+    const c = init(cfg);
+    c.event("queued");
+    c.log("queued-log");
+    c.revokeConsent();
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pagehide"));
+    await new Promise((r) => setTimeout(r, 50));
+    await c.shutdown();
+    expect(f.calls.filter((x) => x.init.method === "POST")).toHaveLength(0); // the remote-config GET at start is not a send
+    expect(beacon).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith("wt-offline");
+    expect(del).toHaveBeenCalledWith("wt-offline-logs");
+  });
+
   it("revoke_stops_drops_queue_and_clears_session", async () => {
     const f = stubFetch();
     const c = init(cfg);

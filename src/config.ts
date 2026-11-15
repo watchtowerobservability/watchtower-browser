@@ -69,17 +69,20 @@ export interface WatchtowerConfig {
   errorSampleRate?: number;
   ignoreUrls?: Matcher[];
   /** default on: reported URLs (page, resource, fetch/XHR spans) lose their query string and fragment, and
-   * secret-looking path segments (UUIDs, >= 24 chars, or >= 10 chars with a letter and a digit) become `:redacted`.
-   * `false` keeps query strings and path ids (the fragment is always dropped). */
-  urlScrubbing?: boolean;
+   * path segments that look like secrets (UUIDs, hex runs, JWTs, long digit runs, random tokens of >= 16 chars) become `:redacted`; hosts and readable words, slugs and short ids stay.
+   * `false` keeps query strings and path ids (the fragment is always dropped).
+   * Presets (same names as the node SDK's `redact`): `"strict"` = `true`; `"pii"` also redacts emails, phone numbers, card numbers and IPv4 addresses in path segments; `"off"` = `false`. */
+  urlScrubbing?: boolean | "strict" | "pii" | "off" | { allow?: RegExp[]; deny?: RegExp[] };
   /** an object with `getSessionId()` (the Lucida browser SDK client); used before `globalThis.lucida` */
-  lucida?: { getSessionId?: () => string };
+  lucida?: { getSessionId?: () => string; getDistinctId?: () => string } | (() => { getSessionId?: () => string; getDistinctId?: () => string } | undefined);
   beforeSend?: (e: RumEventV1) => RumEventV1 | null;
   /** hashed client-side (SHA-256 + project salt) before send */
   user?: { id?: string };
   replay?: ReplayConfig;
   /** co-browse assist (off by default; the project must turn it on too); `scriptUrl` defaults to assist.js beside the core */
   assist?: AssistConfig & { scriptUrl?: string };
+  /** remote control of the page during an assist: off unless `allowControl` is true here (or on `assist`); the project and the end user must agree too */
+  cobrowse?: { allowControl?: boolean };
   profiling?: boolean;
   /** opt-in client storage monitoring (IndexedDB, Cache Storage, localStorage, quota; sql.js/wa-sqlite via
    * the `/storage` entry): slow or failed operations as `db` events, sizes as `storage` events. A lazy chunk. */
@@ -90,9 +93,11 @@ export interface WatchtowerConfig {
   probes?: { key: string; url?: string };
   /** user feedback (ERR-014): the lazy chunk URL, default feedback.js beside the core */
   feedback?: { scriptUrl?: string };
-  /** "pending": nothing runs or is sent (no session, no config fetch) until `grantConsent()`. Default "granted". */
+  /** "pending": nothing runs or is sent (no session, no config fetch) until `grantConsent()`. Default "granted".
+   * While pending, up to 100 calls (`captureError`, `event`, `measure`, `log`, `flag`, `setUser`, `setAttribute`, `setView`) are held in memory and
+   * replayed in order on `grantConsent()` (their timestamps are the replay time); `revokeConsent()` drops them. */
   consent?: "pending" | "granted";
-  /** opt-in: keep an anonymous id in localStorage (default off) */
+  /** opt-in: keep an anonymous id in localStorage (`wt.anon`, sent as the `wt.anon_id` attribute) so it survives sessions. Default off: no id beyond the per-tab session. Removed by revokeConsent(). */
   persistAnonId?: boolean;
   /** set `globalThis[name]` to the client and dispatch `watchtower:ready` on window. `true` = "watchtower".
    * Default: on for the script (IIFE) build, off for npm/ESM. `false` turns the script default off. */

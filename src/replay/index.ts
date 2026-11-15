@@ -37,6 +37,8 @@ export interface ReplayHandle {
   trigger(): void;
   setRemote(r: ReplayRemote): void;
   recording(): boolean;
+  /** the page node a replay node id stands for (co-browse control), null when unknown */
+  node(id: number): Node | null;
 }
 
 type Mode = "full" | "buffer";
@@ -190,6 +192,7 @@ export function startReplay(d: ReplayDeps): ReplayHandle {
       if (!allowed()) stop();
     },
     recording: () => !!stopRec,
+    node: (id) => record.mirror.getNode(id),
   };
   return handle;
 }

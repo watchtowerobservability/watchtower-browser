@@ -5,10 +5,11 @@ interface LucidaLike {
   getDistinctId?: () => string;
 }
 
-/** Lucida's session and distinct ids: the `init({ lucida })` client, else the SDK's `globalThis.lucida`. Never throws. */
-export function lucidaAttrs(client?: LucidaLike): Attrs {
+/** Lucida's session and distinct ids: the `init({ lucida })` client (or a getter `() => client | undefined`), else the SDK's `globalThis.lucida`. Never throws. */
+export function lucidaAttrs(source?: LucidaLike | (() => LucidaLike | undefined)): Attrs {
   const out: Attrs = {};
   try {
+    const client = typeof source === "function" ? source() : source; // a getter is resolved on every call
     const g = (globalThis as { lucida?: LucidaLike }).lucida;
     const s = (client?.getSessionId?.() || undefined) ?? g?.getSessionId?.();
     const d = (client?.getDistinctId?.() || undefined) ?? g?.getDistinctId?.();

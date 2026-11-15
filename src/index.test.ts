@@ -33,6 +33,15 @@ describe("lucida link", () => {
     expect(lucidaAttrs()).toEqual({});
   });
 
+  it("lucida_getter_resolved_lazily", async () => {
+    const { lucidaAttrs } = await import("./lucida");
+    let c: { getSessionId: () => string } | undefined;
+    const get = () => c;
+    expect(lucidaAttrs(get)).toEqual({});
+    c = { getSessionId: () => "late" };
+    expect(lucidaAttrs(get)["lucida.session_id"]).toBe("late");
+  });
+
   it("lucida_distinct_id_attached_when_present", async () => {
     (globalThis as any).lucida = { getSessionId: () => "ls1", getDistinctId: () => "u-7" };
     const { lucidaAttrs } = await import("./lucida");
@@ -173,7 +182,7 @@ describe("safety and privacy", () => {
 
 describe("urls and tunnel", () => {
   it("page_url_is_scrubbed_and_opt_out_keeps_the_query", async () => {
-    history.replaceState(null, "", "/reset/a1b2c3d4e5f6?token=s3cret#x");
+    history.replaceState(null, "", "/reset/a1b2c3d4e5f6a1b2c3?token=s3cret#x");
     let f = stubFetch();
     let c = init(cfg);
     c.flag("a", 1);
@@ -185,7 +194,7 @@ describe("urls and tunnel", () => {
     c = init({ ...cfg, urlScrubbing: false });
     c.flag("a", 1);
     void c.shutdown();
-    expect((await sent(f)).page.url).toBe(`${location.origin}/reset/a1b2c3d4e5f6?token=s3cret`);
+    expect((await sent(f)).page.url).toBe(`${location.origin}/reset/a1b2c3d4e5f6a1b2c3?token=s3cret`);
     history.replaceState(null, "", "/");
   });
 
@@ -207,5 +216,18 @@ describe("urls and tunnel", () => {
     expect(id).not.toBe("");
     c.grantConsent();
     expect(c.sessionId()).toBe(id);
+  });
+});
+
+describe("url scrubbing slugs and rules", () => {
+  it("keeps_kebab_slugs_redacts_tokens_and_honours_allow_deny", async () => {
+    const { redactPath, setUrlScrubbing } = await import("./scrub");
+    setUrlScrubbing(undefined);
+    expect(redactPath("/gallery/legal-consultation-intake")).toBe("/gallery/legal-consultation-intake");
+    expect(redactPath("/x/Xk29dLq0aPz7Xk29dLq0aPz7")).toBe("/x/:redacted");
+    setUrlScrubbing({ allow: [/^Xk29/], deny: [/^legal-/] });
+    expect(redactPath("/x/Xk29dLq0aPz7Xk29dLq0aPz7")).toBe("/x/Xk29dLq0aPz7Xk29dLq0aPz7");
+    expect(redactPath("/g/legal-consultation-intake")).toBe("/g/:redacted");
+    setUrlScrubbing(undefined);
   });
 });

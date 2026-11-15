@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.5 (2026-11-15)
+
+- Privacy: `revokeConsent()` now aborts in-flight event and log sends, makes the transport and log shipper inert (a send that fails after the revoke is not parked offline, the offline restore is skipped), and deletes the `wt-offline` and `wt-offline-logs` IndexedDB databases with `indexedDB.deleteDatabase` instead of only emptying them (also when consent was still pending). No fetch or `sendBeacon` happens after the revoke, including on `pagehide` / `visibilitychange`.
+- `consent: "pending"` now holds up to 100 data calls (`captureError`, `event`, `measure`, `log`, `flag`, `setUser`, `setAttribute`, `setView`) in memory and replays them on `grantConsent()`; `revokeConsent()` drops them. Before, calls made while pending were dropped.
+- `urlScrubbing` also takes the presets `"strict"` (= `true`), `"pii"` (adds emails, phone numbers, card numbers, IPv4 in path segments) and `"off"` (= `false`), named like the node SDK's `redact`.
+- README documents the `propagateTo` contract (`traceparent`, `baggage` only with a Lucida session, never `tracestate`; the target's `Access-Control-Allow-Headers`).
+- New `@watchtowerobservability/browser/beacon` entry (`dist/beacon.js`, `dist/beacon.min.js`, about 1.5 KB gzipped): LCP, CLS, INP (approximated) and up to 10 errors, one `sendBeacon` when the page is hidden. See the README.
+- `persistAnonId: true` is now implemented: an anonymous UUID in `localStorage` (`wt.anon`, sent as the `wt.anon_id` attribute), removed by `revokeConsent()`. Default stays off. Declared in the storage declaration.
+- The build now empties `dist/` first; older builds left stale hashed chunks (`instrument/tracing-*.js`, `web-vitals.attribution-*.js`) that were published (about 81 KB each).
+- `package.json` declares `"license": "Apache-2.0"`.
+
+## 0.5.4
+
+- The build writes `dist/manifest.json`: every `.js` file a self-hoster must serve (path, bytes, sha256, SRI `sha384-` integrity) plus the package version. Generated over the real dist output.
+- `dist/storage.json` (and `storageDeclaration` from `src/storage-declaration.ts`): machine-readable list of every client-side storage item the SDK writes. No cookies.
+- A lazy chunk that fails to load (404, or HTML served by an SPA fallback) logs one `console.error` naming the chunk and base URL and pointing at `manifest.json`. Public methods still never throw.
+
+## 0.5.3
+
+- URL scrubbing is narrower: only secret-looking path segments are redacted (UUIDs, hex runs >= 16, JWTs, digit runs >= 16, random-looking tokens >= 16 chars mixing letters and digits). Hosts are never touched; readable words, kebab/snake slugs, short ids (`/config/a1b2c3d4`) and file names stay. Behaviour change: 10 to 15 character ids that used to be redacted now show, and 24+ character words without a digit are no longer redacted. Same rule as the node SDK and the gateway; `urlScrubbing.allow` / `.deny` still override.
+
+## 0.5.2
+
+- URL scrubbing no longer redacts readable kebab slugs (lowercase words joined by hyphens, e.g. `/gallery/legal-consultation-intake`); `Xk29dLq0aPz7Xk29dLq0aPz7` is still redacted. New `urlScrubbing: { allow?: RegExp[], deny?: RegExp[] }` (tested per path segment; deny wins, then allow, then the defaults). `false` still turns scrubbing off.
+- `init({ lucida })` also takes a getter `() => client | undefined`, resolved each time ids are needed, so the client can load after init.
+
 ## 0.5.1
 
 - **Fix: router adapters had no effect in 0.5.0** (`useNextRouteTracking` and the React, Vue, Angular and Svelte adapters). The adapters and the instrumentation ship as separate bundles, each with its own copy of the route state, so the route the adapter set never reached view names; views stayed concrete URLs (`/gallery/contact`). The route now lives on one shared global. Upgrade to get `/gallery/:typeId`.

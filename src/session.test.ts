@@ -47,4 +47,26 @@ describe("session", () => {
       Object.defineProperty(globalThis, "sessionStorage", orig);
     }
   });
+
+  it("persistAnonId_stores_in_localStorage_and_is_off_by_default", () => {
+    localStorage.removeItem("wt.anon");
+    expect(new Session().anonId()).toBeUndefined();
+    expect(localStorage.getItem("wt.anon")).toBeNull();
+    const a = new Session(undefined, true).anonId();
+    expect(a).toMatch(/^[0-9a-f-]{36}$/);
+    expect(new Session(undefined, true).anonId()).toBe(a); // survives a new session object
+    new Session(undefined, true).clear();
+    expect(localStorage.getItem("wt.anon")).toBeNull();
+  });
+
+  it("persistAnonId_falls_back_to_memory_when_localStorage_is_blocked", () => {
+    const orig = Object.getOwnPropertyDescriptor(globalThis, "localStorage")!;
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new Error("blocked"); } });
+    try {
+      const s = new Session(undefined, true);
+      expect(s.anonId()).toBe(s.anonId());
+    } finally {
+      Object.defineProperty(globalThis, "localStorage", orig);
+    }
+  });
 });

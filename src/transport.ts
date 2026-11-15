@@ -51,6 +51,8 @@ export class Transport {
   readonly rejected: Record<number, number> = {};
   private retryAt = 0;
   private timer?: ReturnType<typeof setTimeout>;
+  private discarded = false;
+  private abort = new AbortController();
   private url: string;
   private now: () => number;
 
@@ -67,6 +69,7 @@ export class Transport {
   }
 
   push(e: RumEventV1): void {
+    if (this.discarded) return;
     this.queue.push(e);
     if (!this.started) return;
     if (this.queue.length >= LIMITS.flushEvents) void this.flush();
@@ -83,9 +86,10 @@ export class Transport {
   }
 
   private async restore(): Promise<void> {
+    if (this.discarded) return;
     try {
       const saved = (await this.o.offline?.drain()) ?? [];
-      if (!saved.length) return;
+      if (!saved.length || this.discarded) return;
       this.queue.requeue(saved);
       this.schedule();
     } catch {
@@ -110,8 +114,10 @@ export class Transport {
     try {
       await this.o.beforeFlush?.();
       const { data, gzip } = await encode(this.body(batch));
+      if (this.discarded) return;
       const f = this.o.fetch ?? globalThis.fetch.bind(globalThis);
       const r = await f(this.url, {
+        signal: this.abort.signal,
         method: "POST",
         body: data,
         keepalive: true,
@@ -121,9 +127,10 @@ export class Transport {
           ...(gzip ? { "Content-Encoding": "gzip" } : {}),
         },
       });
+      if (this.discarded) return;
       this.handle(r.status, r.headers?.get("Retry-After") ?? null, batch);
     } catch {
-      await this.park(batch);
+      if (!this.discarded) await this.park(batch);
     } finally {
       this.busy = false;
     }
@@ -200,8 +207,11 @@ export class Transport {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.started = false;
+    this.discarded = true;
+    this.abort.abort();
     this.queue.take(this.queue.length);
-    void this.o.offline?.drain().catch(() => undefined);
+    if (this.o.offline?.destroy) this.o.offline.destroy();
+    else void this.o.offline?.drain().catch(() => undefined);
   }
 
   async shutdown(): Promise<void> {

@@ -37,6 +37,8 @@ export interface OfflineStore<T> {
   save(items: T[]): Promise<void>;
   /** Return everything stored and clear it. */
   drain(): Promise<T[]>;
+  /** Consent revoked: forget everything, including the database itself. Best effort, never throws. */
+  destroy?(): void;
 }
 
 export const OFFLINE_MAX = 2000;
@@ -56,6 +58,13 @@ export class MemoryStore<T> implements OfflineStore<T> {
   }
   async drain(): Promise<T[]> {
     return this.items.splice(0);
+  }
+}
+
+/** Delete both offline databases (events and logs); used on revoke, also when the client never started. Best effort. */
+export function deleteOfflineDbs(): void {
+  for (const n of ["wt-offline", "wt-offline-logs"]) {
+    try { if (typeof indexedDB !== "undefined") indexedDB.deleteDatabase(n); } catch { /* best effort */ }
   }
 }
 
@@ -84,6 +93,10 @@ export function idbStore<T>(name = "wt-offline", max = OFFLINE_MAX): OfflineStor
     );
   const usable = typeof indexedDB !== "undefined";
   return {
+    destroy() {
+      mem.items = [];
+      try { if (usable) indexedDB.deleteDatabase(name); } catch { /* best effort */ }
+    },
     async save(items) {
       if (!usable) return mem.save(items);
       try {

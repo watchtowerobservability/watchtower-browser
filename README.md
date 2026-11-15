@@ -30,7 +30,25 @@ wt.captureError(new Error("x"));
 
 `pnpm -C sdks/browser test`, `pnpm -C sdks/browser build` (ESM + `dist/wt.min.js` IIFE).
 
-## Self-hosting (vendoring) the script
+## Hosted and self-hosted script
+
+### Hosted copy
+
+Watchtower hosts the build: `<script src="https://edge.watchtowerops.net/sdk/v0/wt.min.js"></script>`. The lazy chunks
+load from the same folder; `https://watchtowerops.net/sdk/v0/` serves the same files. `/sdk/v0/` always carries the
+latest 0.x release, so pin by self-hosting (or by the npm version) if you need a fixed build. CSP:
+
+```
+script-src https://edge.watchtowerops.net;
+connect-src https://edge.watchtowerops.net;
+```
+
+Every build ships `manifest.json` (each file with bytes, sha256 and SRI `sha384-` integrity, plus the version) and
+`storage.json` (every client-side storage item the SDK writes; it sets no cookies). Both are also served at
+`/sdk/v0/manifest.json` and `/sdk/v0/storage.json`. If a chunk cannot load (404, or an SPA fallback answering with
+HTML), the SDK logs one console error naming the chunk and base URL; serve every file in `manifest.json` next to `wt.min.js`.
+
+### Self-hosting (vendoring)
 
 To serve the SDK from your own origin instead of a bundler import, copy the whole `dist/`
 output, not `wt.min.js` alone: the core loads its features lazily from files next to itself.
@@ -101,11 +119,22 @@ options. Without a tunnel route handler the page gets 404s on `/api/wt/v1/rum/ev
 
 Every URL the SDK reports (the page URL in each batch and its referrer, `url` on views, navs, resources and
 vitals, `http.url`, `url.full`, `url.path` and `url.query` on fetch/XHR spans, `page.url` on page-load spans) loses its
-query string and fragment, and path segments that look like secrets become `:redacted`: UUIDs, segments of 24 or more
-characters, and segments of 10 or more characters that contain both a letter and a digit (build assets such as
-`app.3f2a1b9c.js` are left alone). Stack-frame script URLs keep their path (source maps and debug ids match on it) and
-lose only the query. Set `urlScrubbing: false` to send paths and queries as they are (the fragment is still dropped).
+query string and fragment, and path segments that look like secrets become `:redacted`: UUIDs, hex runs of 16 or more, JWTs, digit runs of 16 or more, and random-looking tokens
+of 16 or more characters mixing letters and digits. The host is never touched, and readable words, kebab and snake slugs
+(`legal-consultation-intake`), short ids (`/config/a1b2c3d4`) and file names (`app.3f2a1b9c.js`) stay. Stack-frame script URLs keep their path (source maps and debug ids match on it) and
+lose only the query. Set `urlScrubbing: false` to send paths and queries as they are (the fragment is still dropped). `urlScrubbing: { allow: [/^order-/], deny: [/^acct_/] }` adds your own per-segment
+rules (deny wins, then allow, then the defaults).
+Presets, named like the node SDK's `redact`: `urlScrubbing: "strict"` (= `true`, the default), `"pii"` (strict, plus emails, phone numbers, card numbers and IPv4 addresses in path segments) and `"off"` (= `false`).
 `beforeSend` can still scrub more.
+
+### Trace propagation (`propagateTo`)
+
+`propagateTo: ["https://api.example.com/", /^https:\/\/.*\.example\.com\//]` (string = URL prefix, RegExp = test) lists the
+fetch/XHR URLs that get trace headers; default none, and it needs `otlpEndpoint`. Same-origin requests are not exempt. Headers added:
+`traceparent` (W3C, always) and `baggage: lucida.session_id=<id>` (only when a Lucida session id is known; it replaces a `baggage`
+you set on that request). `tracestate` is never sent. A cross-origin target must answer the preflight with
+`Access-Control-Allow-Headers: traceparent, baggage` (add `content-type`, `authorization` as your calls need) or the browser blocks the request.
+The SDK's own endpoints are never listed.
 
 ### Router adapters and route names
 
@@ -126,7 +155,7 @@ cmp.onWithdraw(() => wt.revokeConsent()); // stops, drops queued events and logs
 ```
 
 With `consent: "pending"` nothing runs and nothing is sent (no session, no config request) until
-`grantConsent()`. Calls made before the grant are dropped, not queued. `revokeConsent()` also works on a
+`grantConsent()`. Data calls made meanwhile (`captureError`, `event`, `measure`, `log`, `flag`, `setUser`, `setAttribute`, `setView`) are held in memory, at most 100 (later ones are dropped), and replayed in order on `grantConsent()` with the replay time as their timestamp; `revokeConsent()` drops them, and calls after a revoke are dropped, not held. Nothing is written to storage while pending. `revokeConsent()` also works on a
 client started without `consent`; a later `grantConsent()` starts a new session.
 
 ### Cookie Munch
@@ -175,6 +204,17 @@ off();                                 // unsubscribe
 `init({ exposeGlobal: true })` (or a name) sets `globalThis.watchtower` to the client and dispatches
 `watchtower:ready` on `window`. It is on by default in the script build and off for npm/ESM; `false` turns the
 script default off.
+
+## Beacon (under 2 KB)
+
+For pages that only need Core Web Vitals and uncaught errors: `@watchtowerobservability/browser/beacon` (`dist/beacon.js`, ESM) or `dist/beacon.min.js` (script tag, global `WatchtowerBeacon`, about 1.5 KB gzipped). No tracing, replay, console capture, storage or dependencies.
+
+```ts
+import { init } from "@watchtowerobservability/browser/beacon";
+init({ key: "wtp_...", endpoint: "https://edge.watchtowerops.net", service: "web", release: "abc123" });
+```
+
+It watches LCP, CLS and INP and the first 10 uncaught errors and unhandled rejections (message and first stack line), then sends one `navigator.sendBeacon` (fallback `fetch` with `keepalive`) when the page is hidden, to `POST <endpoint>/v1/rum/events` in the same batch format as the full SDK. Approximations: CLS is the plain sum of shifts without recent input (not the session-window maximum), and INP is the longest event duration among interactions (web-vitals reports a high percentile), so it can read higher on busy pages. Errors carry no parsed frames, so they are not symbolicated.
 
 ## Source maps
 

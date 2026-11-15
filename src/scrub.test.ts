@@ -11,11 +11,31 @@ describe("url scrubbing", () => {
   it("redacts_secret_looking_segments", () => {
     const uuid = "3b241101-e2bb-4255-8caf-4136c566a962";
     expect(scrubUrl(`https://a.test/invite/${uuid}/accept`)).toBe("https://a.test/invite/:redacted/accept");
-    expect(scrubUrl("/reset/abcdefghijklmnopqrstuvwx")).toBe("/reset/:redacted"); // 24 chars
-    expect(scrubUrl("/s/a1b2c3d4e5")).toBe("/s/:redacted"); // 10 chars with letter and digit
-    expect(scrubUrl("/s/abcdefghij/x")).toBe("/s/abcdefghij/x"); // 10 letters only
-    expect(scrubUrl("/s/1234567890")).toBe("/s/1234567890"); // digits only
+    expect(scrubUrl("/s/a1b2c3d4e5")).toBe("/s/a1b2c3d4e5"); // short id stays
+    expect(scrubUrl("/s/abcdefghijklmnopqrstuvwx")).toBe("/s/abcdefghijklmnopqrstuvwx"); // long word, no digit
+    expect(scrubUrl("/s/1234567890")).toBe("/s/1234567890"); // short digit run
     expect(scrubUrl("/gallery/contact")).toBe("/gallery/contact");
+  });
+
+  it("shared_vectors", () => {
+    const vectors: [string, string][] = [
+      ["https://formize.net/atlas/.well-known/jwks.json", "https://formize.net/atlas/.well-known/jwks.json"],
+      ["https://formize2.net/atlas/x", "https://formize2.net/atlas/x"],
+      ["https://localhost:30000/atlas/x", "https://localhost:30000/atlas/x"],
+      ["//cdn1234567.example.com/a", "//cdn1234567.example.com/a"],
+      ["https://api.cookiemunch.net/config/default", "https://api.cookiemunch.net/config/default"],
+      ["https://api.cookiemunch.net/config/a1b2c3d4", "https://api.cookiemunch.net/config/a1b2c3d4"],
+      ["https://api.cookiemunch.net/config/Xk29dLq0aPz7Xk29", "https://api.cookiemunch.net/config/:redacted"],
+      ["/gallery/legal-consultation-intake", "/gallery/legal-consultation-intake"],
+      ["/reports/invoice-2024-q1-summary", "/reports/invoice-2024-q1-summary"],
+      ["/api/feed/Xk29dLq0aPz7Xk29dLq0aPz7/csv?since=1", "/api/feed/:redacted/csv"],
+      ["/invite/3b241101-e2bb-4255-8caf-4136c566a962/accept", "/invite/:redacted/accept"],
+      ["/s/0123456789abcdef", "/s/:redacted"],
+      ["/t/eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln", "/t/:redacted"],
+      ["/c/1234567890123456", "/c/:redacted"],
+      ["/o/12345678901", "/o/12345678901"],
+    ];
+    for (const [i, o] of vectors) expect(scrubUrl(i)).toBe(o);
   });
 
   it("keeps_host_and_build_asset_names", () => {
@@ -38,9 +58,9 @@ describe("url scrubbing", () => {
 
   it("span_attributes_are_scrubbed_in_place", () => {
     const a: Record<string, unknown> = {
-      "http.url": "https://a.test/api/a1b2c3d4e5f6?email=x@y.z",
+      "http.url": "https://a.test/api/a1b2c3d4e5f6a1b2c3?email=x@y.z",
       "url.full": "https://a.test/api/x?q=1",
-      "url.path": "/api/a1b2c3d4e5f6",
+      "url.path": "/api/a1b2c3d4e5f6a1b2c3",
       "url.query": "q=1",
       "http.method": "GET",
     };
@@ -53,3 +73,22 @@ describe("url scrubbing", () => {
     });
   });
 });
+
+describe("url scrubbing presets", () => {
+  it("strict_is_default_and_off_keeps_ids", () => {
+    setUrlScrubbing("strict");
+    expect(scrubUrl("/s/0123456789abcdef?x=1")).toBe("/s/:redacted");
+    setUrlScrubbing("off");
+    expect(scrubUrl("/s/0123456789abcdef?x=1#f")).toBe("/s/0123456789abcdef?x=1");
+  });
+
+  it("pii_redacts_email_phone_card_ip_but_not_dates", () => {
+    setUrlScrubbing("strict");
+    expect(scrubUrl("/u/a@b.com/p/+14155550123/ip/10.0.0.1")).toBe("/u/a@b.com/p/+14155550123/ip/10.0.0.1");
+    setUrlScrubbing("pii");
+    expect(scrubUrl("/u/jo%40x.org/p/+14155550123")).toBe("/u/:redacted/p/:redacted");
+    expect(scrubUrl("/c/4111 1111 1111 1111/ip/10.0.0.1")).toBe("/c/:redacted/ip/:redacted");
+    expect(scrubUrl("/archive/2024-11-15/gallery")).toBe("/archive/2024-11-15/gallery");
+  });
+});
+

@@ -10,11 +10,31 @@ interface Stored {
 }
 
 const KEY = "wt.session";
+const ANON_KEY = "wt.anon";
 
 /** UUIDv4 session in sessionStorage (memory fallback), 30 min idle and 4 h max rollover. No cookies. */
 export class Session {
   private mem?: Stored;
-  constructor(private now: () => number = Date.now) {}
+  private anon?: string;
+  constructor(private now: () => number = Date.now, private persistAnon = false) {}
+
+  /** Anonymous id kept in localStorage across sessions (opt-in `persistAnonId`); undefined when off. Falls back to memory when storage is blocked. */
+  anonId(): string | undefined {
+    if (!this.persistAnon) return undefined;
+    try {
+      const v = globalThis.localStorage?.getItem(ANON_KEY);
+      if (v) return (this.anon = v);
+    } catch {
+      /* blocked storage */
+    }
+    this.anon ??= uuid();
+    try {
+      globalThis.localStorage?.setItem(ANON_KEY, this.anon);
+    } catch {
+      /* memory only */
+    }
+    return this.anon;
+  }
 
   private read(): Stored | undefined {
     try {
@@ -48,9 +68,15 @@ export class Session {
     return s;
   }
 
-  /** Consent revoked: forget the session id. */
+  /** Consent revoked: forget the session id and the persisted anonymous id. */
   clear(): void {
     this.mem = undefined;
+    this.anon = undefined;
+    try {
+      globalThis.localStorage?.removeItem(ANON_KEY);
+    } catch {
+      /* blocked storage */
+    }
     try {
       globalThis.sessionStorage?.removeItem(KEY);
     } catch {

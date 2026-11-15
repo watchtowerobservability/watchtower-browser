@@ -21,6 +21,8 @@ export class LogShipper {
   private failures = 0;
   private retryAt = 0;
   private parked = false;
+  private discarded = false;
+  private abort = new AbortController();
 
   /**
    * `offline` holds batches the network refused (delivery is at-least-once: a lost response resends).
@@ -43,6 +45,7 @@ export class LogShipper {
   }
 
   push(level: LogLevel, message: string, attrs: Attrs, span?: { trace_id?: string; span_id?: string }): void {
+    if (this.discarded) return;
     if (this.buf.length >= MAX_BUFFER) return;
     this.buf.push({
       timeUnixNano: `${Date.now()}000000`,
@@ -66,7 +69,10 @@ export class LogShipper {
     this.timer = undefined;
     this.buf = [];
     this.parked = false;
-    void this.offline?.drain().catch(() => undefined);
+    this.discarded = true;
+    this.abort.abort();
+    if (this.offline?.destroy) this.offline.destroy();
+    else void this.offline?.drain().catch(() => undefined);
   }
 
   /** Batch goes back to the front of the buffer (bounded), the next try waits with backoff or `Retry-After`. */
@@ -97,6 +103,7 @@ export class LogShipper {
   }
 
   private async restore(): Promise<void> {
+    if (this.discarded) return;
     try {
       const saved = (await this.offline?.drain()) ?? [];
       const room = Math.max(0, MAX_BUFFER - this.buf.length);
@@ -130,10 +137,13 @@ export class LogShipper {
     });
     try {
       // keepalive survives page hide; sendBeacon cannot carry the Authorization header
+      if (this.discarded) return;
       const r = await fetch(url, {
+        signal: this.abort.signal,
         method: "POST", keepalive: body.length < 60_000,
         headers: { "content-type": "application/json", authorization: `Bearer ${this.key}` }, body,
       });
+      if (this.discarded) return;
       if (r.status < 300) {
         this.failures = 0;
         this.retryAt = 0;
@@ -145,6 +155,7 @@ export class LogShipper {
         this.warn(`HTTP ${r.status} from ${url}`);
       }
     } catch {
+      if (this.discarded) return;
       this.warn(`no answer from ${url}`);
       await this.park(logRecords);
     }

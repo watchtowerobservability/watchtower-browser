@@ -1,0 +1,34 @@
+{
+  "package": "@watchtowerobservability/browser",
+  "cookies": false,
+  "items": [
+    {
+      "type": "sessionStorage",
+      "name": "wt.session",
+      "purpose": "Anonymous session id (UUIDv4), session start, last activity and a sampling draw",
+      "lifetime": "Cleared when the tab closes; rolls over after 30 minutes idle or 4 hours total; removed by revokeConsent()",
+      "writtenWhen": "consent"
+    },
+    {
+      "type": "localStorage",
+      "name": "wt.anon",
+      "purpose": "Anonymous id (UUIDv4) that survives sessions",
+      "lifetime": "Until cleared; only written when persistAnonId is true; removed by revokeConsent()",
+      "writtenWhen": "consent, and only with persistAnonId"
+    },
+    {
+      "type": "indexedDB",
+      "name": "wt-offline",
+      "purpose": "Event batches that could not be sent (offline or 5xx), resent later; bounded count",
+      "lifetime": "Until the batch is delivered or the bounded store overflows; emptied by revokeConsent()",
+      "writtenWhen": "consent, and only while the network refuses a send"
+    },
+    {
+      "type": "indexedDB",
+      "name": "wt-offline-logs",
+      "purpose": "Log batches that could not be sent, resent later; bounded count",
+      "lifetime": "Until the batch is delivered or the bounded store overflows; emptied by revokeConsent()",
+      "writtenWhen": "consent, and only while the network refuses a send"
+    }
+  ]
+}
