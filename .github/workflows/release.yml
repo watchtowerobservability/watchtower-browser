@@ -36,7 +36,7 @@ jobs:
       - run: npm pack --ignore-scripts
       - name: Install the packed tarball into clean projects (import, tsc skipLibCheck:false, next build)
         run: sh test/fixtures/consumers.sh
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: '*.tgz'
       - name: GitHub release
