@@ -9,6 +9,7 @@ import { LIMITS, type Matcher, type WatchtowerConfig } from "../config";
 import { posthogAttrs } from "../posthog";
 import { ActionContextManager, installUserActions } from "./actions";
 import { scrubSpanAttrs } from "../scrub";
+import { warnOnRefusal } from "./export-warn";
 import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx";
 
 /** Same-origin is deliberately not implicit; the Watchtower endpoints never get a trace header. */
@@ -58,10 +59,10 @@ export function installTracing(ctx: Ctx): Uninstall {
   };
   const ignoreUrls = [abs(cfg.endpoint), abs(cfg.otlpEndpoint), ...(cfg.ignoreUrls ?? [])].map(toRegex);
 
-  const exporter = new OTLPTraceExporter({
-    url: `${base}/v1/traces`,
-    headers: { Authorization: `Bearer ${cfg.publishableKey}` },
-  });
+  const exporter = warnOnRefusal(
+    new OTLPTraceExporter({ url: `${base}/v1/traces`, headers: { Authorization: `Bearer ${cfg.publishableKey}` } }),
+    `${abs(base)}/v1/traces`,
+  );
   const cm = new ActionContextManager();
   let actions: ReturnType<typeof installUserActions> | undefined;
   const provider = new WebTracerProvider({

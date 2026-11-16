@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.7 (2026-11-16)
+
+- Spans the endpoint refuses (HTTP 401, 403 or 404 on `/v1/traces`) now log one console warning per page load naming the URL and status, instead of being dropped silently. The edge now serves `POST /v1/traces` for publishable keys, so the `tunnelHandler` setup delivers spans.
+
 ## 0.5.6 (2026-11-15)
 
 - Behaviour change (privacy): with `userActions` on, an action with no `data-wt-action` is named by a text-free selector (tag, id, up to 3 classes, `data-testid`, or `name`), never by the element's text, which could hold names and emails on admin screens. New option `actionNameFromText: true` restores text names (<= 128 chars). `data-wt-action` still wins.
