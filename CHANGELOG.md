@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.8 (2026-11-16)
+
+- Fix: `propagateTo` without `otlpEndpoint` injected no `traceparent` (tracing was off). It now sends spans to `endpoint` (the edge, or your tunnel), which accepts `/v1/traces` for publishable keys. `otlpEndpoint` still wins when set. If no endpoint is usable, one console warning explains.
+- Behaviour change: requests to `propagateTo` origins no longer carry W3C `baggage` (it leaked `lucida.session_id` and broke CORS preflights that allow only `traceparent`/`tracestate`). Only `traceparent` is sent. New opt-in `propagateBaggage: true` restores the Lucida session baggage.
+
 ## 0.5.7 (2026-11-16)
 
 - Spans the endpoint refuses (HTTP 401, 403 or 404 on `/v1/traces`) now log one console warning per page load naming the URL and status, instead of being dropped silently. The edge now serves `POST /v1/traces` for publishable keys, so the `tunnelHandler` setup delivers spans.

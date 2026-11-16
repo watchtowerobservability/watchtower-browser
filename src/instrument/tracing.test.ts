@@ -1,11 +1,11 @@
 import { ROOT_CONTEXT, trace, type Span } from "@opentelemetry/api";
-import { describe, expect, it } from "vitest";
-import { makePropagator } from "./tracing";
+import { describe, expect, it, vi } from "vitest";
+import { installTracing, makePropagator, otlpFor } from "./tracing";
 import { baseCfg, mkCtx } from "./testutil";
 
 /** Run the propagator the way the fetch instrumentation does: span in context, carrier = headers. */
-function inject(url: string, propagateTo?: Array<string | RegExp>, lucida?: string): Record<string, string> {
-  const { c } = mkCtx({ propagateTo });
+function inject(url: string, propagateTo?: Array<string | RegExp>, lucida?: string, propagateBaggage?: boolean): Record<string, string> {
+  const { c } = mkCtx({ propagateTo, propagateBaggage });
   const span = {
     spanContext: () => ({ traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 }),
     attributes: { "http.url": url },
@@ -18,10 +18,26 @@ function inject(url: string, propagateTo?: Array<string | RegExp>, lucida?: stri
 }
 
 describe("traceparent", () => {
-  it("baggage_carries_lucida_session_only_where_traceparent_goes", () => {
-    expect(inject("https://api.mine.test/x", ["https://api.mine.test"], "ls 1").baggage).toBe("lucida.session_id=ls%201");
-    expect(inject("https://api.other.com/x", ["https://api.mine.test"], "ls1").baggage).toBeUndefined();
-    expect(inject("https://api.mine.test/x", ["https://api.mine.test"]).baggage).toBeUndefined();
+  it("baggage_is_opt_in_and_only_where_traceparent_goes", () => {
+    const a = ["https://api.mine.test"];
+    expect(inject("https://api.mine.test/x", a, "ls 1").baggage).toBeUndefined();
+    expect(inject("https://api.mine.test/x", a, "ls 1", true).baggage).toBe("lucida.session_id=ls%201");
+    expect(inject("https://api.other.com/x", a, "ls1", true).baggage).toBeUndefined();
+    expect(inject("https://api.mine.test/x", a, undefined, true).baggage).toBeUndefined();
+  });
+
+  it("propagateTo_without_otlpEndpoint_defaults_to_edge_endpoint", () => {
+    const { c } = mkCtx({ otlpEndpoint: undefined, propagateTo: ["https://api.mine.test"] });
+    expect(otlpFor(c.cfg)).toBe("https://edge.test");
+    expect(otlpFor(mkCtx({ otlpEndpoint: undefined }).c.cfg)).toBe("");
+    expect(otlpFor(mkCtx({ propagateTo: ["x"] }).c.cfg)).toBe("https://otlp.test");
+  });
+
+  it("warns_once_when_propagateTo_has_nowhere_to_send_spans", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    installTracing(mkCtx({ endpoint: "", otlpEndpoint: undefined, propagateTo: ["https://api.mine.test"] }).c);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it("traceparent_not_sent_to_unlisted_origin", () => {

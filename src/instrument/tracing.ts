@@ -33,12 +33,12 @@ export function makePropagator(cfg: WatchtowerConfig, isOwn: (u: string) => bool
       if (!span || !shouldPropagate(spanUrl(span), cfg, isOwn)) return;
       const sc = span.spanContext();
       setter.set(carrier, "traceparent", `00-${sc.traceId}-${sc.spanId}-0${sc.traceFlags & 1}`);
-      // same allow-list as traceparent; replaces any baggage header the host set on this request
+      // opt-in: baggage broke customer CORS preflights that allow only traceparent/tracestate
       const l = lucidaId?.();
-      if (l) setter.set(carrier, "baggage", `lucida.session_id=${encodeURIComponent(l)}`);
+      if (l && cfg.propagateBaggage) setter.set(carrier, "baggage", `lucida.session_id=${encodeURIComponent(l)}`);
     },
     extract: (context) => context,
-    fields: () => ["traceparent", "baggage"],
+    fields: () => (cfg.propagateBaggage ? ["traceparent", "tracestate", "baggage"] : ["traceparent", "tracestate"]),
   };
 }
 
@@ -46,10 +46,17 @@ const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** OTel wants RegExp|string equality; ours are prefixes. */
 const toRegex = (m: Matcher): RegExp => (typeof m === "string" ? new RegExp(`^${esc(m)}`) : m);
 
+/** propagateTo without otlpEndpoint: the edge (or tunnel) `endpoint` also accepts /v1/traces. */
+export const otlpFor = (cfg: WatchtowerConfig): string => cfg.otlpEndpoint || (cfg.propagateTo?.length ? cfg.endpoint : "");
+
 export function installTracing(ctx: Ctx): Uninstall {
   const cfg = ctx.cfg;
-  if (!cfg.otlpEndpoint) return () => undefined;
-  const base = cfg.otlpEndpoint.replace(/\/$/, "");
+  const otlp = otlpFor(cfg);
+  if (!otlp) {
+    if (cfg.propagateTo?.length) console.warn("[watchtower] propagateTo is set but neither otlpEndpoint nor endpoint is configured; no traceparent will be sent");
+    return () => undefined;
+  }
+  const base = otlp.replace(/\/$/, "");
   const abs = (u: string): string => {
     try {
       return new URL(u, location.href).href; // a same-origin tunnel endpoint is relative
@@ -57,7 +64,7 @@ export function installTracing(ctx: Ctx): Uninstall {
       return u;
     }
   };
-  const ignoreUrls = [abs(cfg.endpoint), abs(cfg.otlpEndpoint), ...(cfg.ignoreUrls ?? [])].map(toRegex);
+  const ignoreUrls = [abs(cfg.endpoint), abs(otlp), ...(cfg.ignoreUrls ?? [])].map(toRegex);
 
   const exporter = warnOnRefusal(
     new OTLPTraceExporter({ url: `${base}/v1/traces`, headers: { Authorization: `Bearer ${cfg.publishableKey}` } }),

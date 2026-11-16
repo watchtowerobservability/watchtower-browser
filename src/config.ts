@@ -56,6 +56,8 @@ export interface WatchtowerConfig {
   environment?: string;
   /** traceparent is injected only into requests matching these (string = URL prefix); default none */
   propagateTo?: Matcher[];
+  /** Also send W3C `baggage` (the Lucida session id) to `propagateTo` origins. Default false: only traceparent/tracestate, so CORS allow-lists need not list `baggage`. */
+  propagateBaggage?: boolean;
   /** URL of the lazy instrumentation chunk (default: instrument/index.js beside the core) */
   instrumentUrl?: string;
   /** capture console.error as error events (default off) */
