@@ -113,3 +113,20 @@ describe("transport", () => {
     expect(JSON.parse(f.mock.calls[1]![1].body as string).attrs["wt.sdk.rejected"]).toBe("413:2");
   });
 });
+
+it("origin_not_allowed_403_warns_once_regardless_of_debug", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const body = JSON.stringify({ error: "origin_not_allowed", origin: "https://app.test", key: "wtp_abcd…" });
+  const f = vi.fn(async () => new Response(body, { status: 403, headers: { "content-type": "application/json" } }));
+  const t = new Transport({ endpoint: "https://e.example", key: "k", envelope: () => ({ session_id: "s", sent_at_ns: 1, sdk: { name: "n", version: "v" }, app: { service: "a" }, page: { url: "u" }, device: { ua: "u" }, user: {}, attrs: {} }), fetch: f as unknown as typeof fetch });
+  t.start();
+  for (let i = 0; i < 2; i++) {
+    t.push({ id: String(i), ts_ns: 1, type: "action", name: "x", attrs: {} });
+    await t.flush();
+  }
+  await new Promise((r) => setTimeout(r, 10));
+  expect(warn).toHaveBeenCalledTimes(1);
+  expect(String(warn.mock.calls[0]![0])).toContain("https://app.test");
+  expect(String(warn.mock.calls[0]![0])).toContain("allow_localhost");
+  warn.mockRestore();
+});

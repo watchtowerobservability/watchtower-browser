@@ -1,4 +1,5 @@
 import { LIMITS, type Attrs } from "./config";
+import { nowMs } from "./ids";
 import type { OfflineStore } from "./queue";
 
 export type LogLevel = "debug" | "log" | "info" | "warn" | "error";
@@ -48,7 +49,7 @@ export class LogShipper {
     if (this.discarded) return;
     if (this.buf.length >= MAX_BUFFER) return;
     this.buf.push({
-      timeUnixNano: `${Date.now()}000000`,
+      timeUnixNano: `${nowMs()}000000`,
       severityNumber: SEVERITY[level] ?? 9,
       severityText: level.toUpperCase(),
       body: { stringValue: message },

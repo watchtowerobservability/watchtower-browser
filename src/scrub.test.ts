@@ -90,5 +90,15 @@ describe("url scrubbing presets", () => {
     expect(scrubUrl("/c/4111 1111 1111 1111/ip/10.0.0.1")).toBe("/c/:redacted/ip/:redacted");
     expect(scrubUrl("/archive/2024-11-15/gallery")).toBe("/archive/2024-11-15/gallery");
   });
+
+  it("object_form_combines_preset_with_allow_and_deny", () => {
+    setUrlScrubbing({ preset: "pii", allow: [/^a@b\.com$/], deny: [/^secret-word$/] });
+    expect(scrubUrl("/u/a@b.com/x/c@d.com/y/secret-word")).toBe("/u/a@b.com/x/:redacted/y/:redacted");
+    setUrlScrubbing({ allow: [/^0123456789abcdef$/] }); // old form: strict, allow overrides
+    expect(scrubUrl("/s/0123456789abcdef")).toBe("/s/0123456789abcdef");
+    setUrlScrubbing({ preset: "off" });
+    expect(scrubUrl("/s/0123456789abcdef?x=1")).toBe("/s/0123456789abcdef?x=1");
+    setUrlScrubbing("strict");
+  });
 });
 

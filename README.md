@@ -128,7 +128,7 @@ of 16 or more characters mixing letters and digits. The host is never touched, a
 (`legal-consultation-intake`), short ids (`/config/a1b2c3d4`) and file names (`app.3f2a1b9c.js`) stay. Stack-frame script URLs keep their path (source maps and debug ids match on it) and
 lose only the query. Set `urlScrubbing: false` to send paths and queries as they are (the fragment is still dropped). `urlScrubbing: { allow: [/^order-/], deny: [/^acct_/] }` adds your own per-segment
 rules (deny wins, then allow, then the defaults).
-Presets, named like the node SDK's `redact`: `urlScrubbing: "strict"` (= `true`, the default), `"pii"` (strict, plus emails, phone numbers, card numbers and IPv4 addresses in path segments) and `"off"` (= `false`).
+Presets, named like the node SDK's `redact`: `urlScrubbing: "strict"` (= `true`, the default), `"pii"` (strict, plus emails, phone numbers, card numbers and IPv4 addresses in path segments) and `"off"` (= `false`). A preset and your own rules combine: `urlScrubbing: { preset: "pii", allow: [/^order-/], deny: [/^acct_/] }`.
 `beforeSend` can still scrub more.
 
 ### Trace propagation (`propagateTo`)
@@ -209,6 +209,20 @@ off();                                 // unsubscribe
 `watchtower:ready` on `window`. It is on by default in the script build and off for npm/ESM; `false` turns the
 script default off.
 
+## Errors without consent (under 2.5 KB)
+
+`@watchtowerobservability/browser/errors` reports uncaught errors and unhandled rejections with no consent banner needed: no cookies, no localStorage or sessionStorage, no session or user id. Use it for visitors who have not (or not yet) accepted statistics; with `consent: "pending"` the full client sends nothing, and `revokeConsent()` drops what it held.
+
+```ts
+import { initErrors, captureError } from "@watchtowerobservability/browser/errors";
+initErrors({ endpoint: "https://edge.watchtowerops.net", publishableKey: "wtp_...", release: "abc123", maxEvents: 50 });
+captureError(new Error("handled")); // optional
+```
+
+Each error is one `fetch` POST (`keepalive`, `text/plain`, key in `?k=`: no preflight). Max `maxEvents` per page, identical message and stack once. When you later call the full client's `init` (e.g. after consent), it takes over the handlers and `captureError` of this entry, so errors are not reported twice. Calls held by `consent: "pending"` keep their original timestamp when replayed on `grantConsent()`.
+
+If the edge answers 403 `origin_not_allowed`, the SDK logs one console warning per page load: add the origin to the publishable key's origins, or use `allow_localhost` for development.
+
 ## Beacon (under 2 KB)
 
 For pages that only need Core Web Vitals and uncaught errors: `@watchtowerobservability/browser/beacon` (`dist/beacon.js`, ESM) or `dist/beacon.min.js` (script tag, global `WatchtowerBeacon`, about 1.5 KB gzipped). No tracing, replay, console capture, storage or dependencies.
@@ -240,7 +254,7 @@ idempotent), then post each map to `/artifacts?kind=sourcemap&release=<v>&name=<
 - Release: `release` option, else `$WT_RELEASE`, else the short sha (`git rev-parse --short HEAD`), the
   same value the deploy markers and `service.version` use. Pass the same value to `init({ release })`; when omitted, `init` reads `data-release` from the script tag, `<meta name="wt-release">` or a build-injected `__WT_RELEASE__`.
 - Key: `apiKey` or `$WT_API_KEY`, a secret key (publishable `wtp_` keys are refused). Maps are deleted after
-  upload unless `deleteSourcemapsAfterUpload: false`; upload errors fail the build when `$CI` is set (`failOnError` defaults to true there) and only warn otherwise; set `failOnError` explicitly to override.
+  upload unless `deleteSourcemapsAfterUpload: false`; each upload retries up to 4 times on 429, 5xx and network errors (exponential backoff, `Retry-After` honoured) with at most 4 uploads in flight; a failed upload only logs a warning (`failOnError` defaults to false; set `failOnError: true` to fail the build). For maps written by later build steps (after the plugin ran), upload them with `wtctl sourcemaps upload`.
 
 ### CI-only upload of hidden maps
 

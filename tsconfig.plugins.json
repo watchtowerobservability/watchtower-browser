@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false, "declaration": true, "emitDeclarationOnly": true, "rootDir": "plugins", "outDir": "dist/plugins" },
+  "include": ["plugins/vite.ts", "plugins/rollup.ts", "plugins/webpack.ts"],
+  "exclude": ["plugins/**/*.test.ts"]
+}

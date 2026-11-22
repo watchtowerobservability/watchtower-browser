@@ -9,7 +9,7 @@ import {
   type WtErrorEvent,
   type WtVital,
 } from "./config";
-import { hashUserId, rand, uuid } from "./ids";
+import { clock, hashUserId, nowMs, rand, uuid } from "./ids";
 import { lucidaAttrs } from "./lucida";
 import { scrubUrl, setUrlScrubbing, stripQuery } from "./scrub";
 import { posthogAttrs, registerSession } from "./posthog";
@@ -146,17 +146,17 @@ const HELD = new Set<string>(["captureError", "event", "measure", "log", "flag",
 const HELD_MAX = 100;
 
 /** Consent gate: calls go to the running client, or to the no-op one until consent is granted. While consent is
- * "pending" (never granted, not revoked) up to 100 data calls are held in memory, replayed on `grantConsent()`
+ * "pending" (never granted, not revoked) up to 100 data calls are held in memory, replayed on `grantConsent()` with their original timestamps
  * and dropped on `revokeConsent()`; after a revoke they are dropped, not held. */
 function gated(cfg: WatchtowerConfig): WatchtowerClient {
   let cur: Built | undefined = cfg.consent === "pending" ? undefined : build(cfg);
-  let held: Array<[keyof WatchtowerClient, unknown[]]> | undefined = cur ? undefined : [];
+  let held: Array<[keyof WatchtowerClient, unknown[], number]> | undefined = cur ? undefined : [];
   const c = (): WatchtowerClient => cur?.client ?? NOOP_CLIENT;
   const out: Record<string, unknown> = {};
   for (const k of Object.keys(NOOP_CLIENT) as Array<keyof WatchtowerClient>) {
     out[k] = (...a: unknown[]) => {
       if (!cur && held && HELD.has(k)) {
-        if (held.length < HELD_MAX) held.push([k, a]);
+        if (held.length < HELD_MAX) held.push([k, a, Date.now()]);
         return undefined;
       }
       return (c()[k] as (...x: unknown[]) => unknown)(...a);
@@ -168,7 +168,11 @@ function gated(cfg: WatchtowerConfig): WatchtowerClient {
     cur = build(cfg);
     const q = held ?? [];
     held = undefined;
-    for (const [k, a] of q) safe(() => (cur!.client[k] as (...x: unknown[]) => unknown)(...a), undefined, cfg.debug)();
+    for (const [k, a, at] of q) {
+      clock.at = at;
+      safe(() => (cur!.client[k] as (...x: unknown[]) => unknown)(...a), undefined, cfg.debug)();
+    }
+    clock.at = 0;
   }, undefined, cfg.debug);
   out.revokeConsent = safe(() => {
     cur?.revoke();
@@ -255,7 +259,7 @@ function build(cfg: WatchtowerConfig): Built {
   const emit = (type: RumEventV1["type"], name: string, extra: Partial<RumEventV1> = {}): void => {
     if (stopped || paused || !remote.rum_enabled) return;
     if (!session.sampled(rate()) && !(type === "error" && rand() < errRate())) return;
-    let e: RumEventV1 | null = { id: uuid(), ts_ns: Date.now() * 1e6, type, name, attrs: {}, ...extra };
+    let e: RumEventV1 | null = { id: uuid(), ts_ns: nowMs() * 1e6, type, name, attrs: {}, ...extra };
     if (type === "error") e.attrs = { ...lucida(), ...e.attrs };
     if (cfg.beforeSend) e = cfg.beforeSend(e);
     if (!e) return;
@@ -280,7 +284,7 @@ function build(cfg: WatchtowerConfig): Built {
   // beforeSend sees the same `action`/`log` shape it always did, so existing scrubbers keep working
   const log = (level: LogLevel, message: string, at: Attrs = {}, span?: { trace_id?: string; span_id?: string }): void => {
     if (stopped || paused || !remote.rum_enabled || remote.browser_logs === false || !session.sampled(rate())) return;
-    let e: RumEventV1 | null = { id: uuid(), ts_ns: Date.now() * 1e6, type: "action", name: "log",
+    let e: RumEventV1 | null = { id: uuid(), ts_ns: nowMs() * 1e6, type: "action", name: "log",
       attrs: { ...at, "log.level": level, message: message.slice(0, 2048) } };
     if (cfg.beforeSend) e = cfg.beforeSend(e);
     if (!e) return;
@@ -514,5 +518,7 @@ function build(cfg: WatchtowerConfig): Built {
     logs.discard();
     session.clear();
   };
+  // the consent-free `/errors` entry steps aside: this client's own handlers take over, its captureError forwards here
+  safe(() => (globalThis as { [k: symbol]: { handoff?: (f: (e: unknown) => void) => void } | undefined })[Symbol.for("watchtower.errors")]?.handoff?.((e) => client.captureError(e)), undefined, d)();
   return { client, revoke };
 }

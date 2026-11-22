@@ -1,4 +1,5 @@
 import { DEFAULT_REMOTE, LIMITS, type RemoteConfig } from "./config";
+import { warnOrigin } from "./transport";
 
 /** Fetch `/v1/rum/config` with a 2 s timeout; any failure yields the safe defaults (RUM on, replay off). */
 export async function fetchRemoteConfig(
@@ -13,7 +14,10 @@ export async function fetchRemoteConfig(
       headers: { Authorization: `Bearer ${key}` },
       signal: ctl.signal,
     });
-    if (!r.ok) return DEFAULT_REMOTE;
+    if (!r.ok) {
+      void warnOrigin(r);
+      return DEFAULT_REMOTE;
+    }
     const j = (await r.json()) as Partial<RemoteConfig>;
     return { ...DEFAULT_REMOTE, ...j, replay: { enabled: j.replay?.enabled === true, ...maskLevel(j.replay) } };
   } catch {

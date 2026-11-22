@@ -15,6 +15,8 @@ await build({ ...common, entryPoints: ["src/lite.ts"], format: "esm", plugins: [
 // `/beacon` entry: ~1.5 KB RUM beacon (vitals + errors, one sendBeacon), ESM and a script-tag IIFE.
 await build({ ...common, entryPoints: ["src/beacon.ts"], format: "esm", outfile: "dist/beacon.js" });
 await build({ ...common, entryPoints: ["src/beacon.ts"], format: "iife", globalName: "WatchtowerBeacon", sourcemap: false, outfile: "dist/beacon.min.js" });
+// `/errors` entry: consent-free, storage-free error capture (handed off to the full client when it starts).
+await build({ ...common, entryPoints: ["src/errors.ts"], format: "esm", outfile: "dist/errors.js" });
 // Lazy replay chunk (rrweb record + fflate), loaded on demand by the core via `replay.scriptUrl`.
 await build({ ...common, entryPoints: ["src/replay/index.ts"], format: "esm", outfile: "dist/replay.js" });
 // Lazy co-browse assist chunk (RPL-012), loaded only with `assist.enabled`.

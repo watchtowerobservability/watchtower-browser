@@ -1,6 +1,6 @@
 {
   "name": "@watchtowerobservability/browser",
-  "version": "0.5.8",
+  "version": "0.6.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/watchtowerobservability/watchtower-browser.git"
@@ -37,6 +37,10 @@
       "types": "./dist/beacon.d.ts",
       "default": "./dist/beacon.js"
     },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "default": "./dist/errors.js"
+    },
     "./react": {
       "types": "./dist/adapters/react.d.ts",
       "default": "./dist/adapters/react.js"
@@ -57,9 +61,18 @@
       "types": "./dist/adapters/svelte.d.ts",
       "default": "./dist/adapters/svelte.js"
     },
-    "./vite-plugin": "./dist/plugins/vite.js",
-    "./rollup-plugin": "./dist/plugins/rollup.js",
-    "./webpack-plugin": "./dist/plugins/webpack.js",
+    "./vite-plugin": {
+      "types": "./dist/plugins/vite.d.ts",
+      "default": "./dist/plugins/vite.js"
+    },
+    "./rollup-plugin": {
+      "types": "./dist/plugins/rollup.d.ts",
+      "default": "./dist/plugins/rollup.js"
+    },
+    "./webpack-plugin": {
+      "types": "./dist/plugins/webpack.d.ts",
+      "default": "./dist/plugins/webpack.js"
+    },
     "./package.json": "./package.json"
   },
   "peerDependencies": {
@@ -75,7 +88,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "node esbuild.config.mjs && tsgo -p tsconfig.build.json",
+    "build": "node esbuild.config.mjs && tsgo -p tsconfig.build.json && tsgo -p tsconfig.plugins.json",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run"
   },

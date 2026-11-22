@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { init } from "./index";
-import { stubFetch } from "./testutil";
+import { bodyOf, stubFetch } from "./testutil";
 
 const cfg = { publishableKey: "wtp_abcd1234_x", endpoint: "https://edge.test", service: "web" };
 
@@ -82,5 +82,20 @@ describe("consent", () => {
 
     c.grantConsent();
     expect(c.sessionId()).not.toBe(id);
+  });
+});
+
+describe("pending replay keeps the original timestamp", () => {
+  it("held_events_are_not_stamped_with_the_replay_time", async () => {
+    const f = stubFetch();
+    const c = init({ ...cfg, consent: "pending" });
+    const t0 = Date.now();
+    c.event("old-one");
+    await new Promise((r) => setTimeout(r, 60));
+    c.grantConsent();
+    void c.shutdown();
+    await vi.waitFor(() => expect(f.events().length).toBeGreaterThan(0), { timeout: 3000 });
+    const ev = f.events().flatMap((x) => bodyOf(x.init).events).find((e: { name: string }) => e.name === "old-one");
+    expect(ev.ts_ns / 1e6).toBeLessThan(t0 + 50);
   });
 });

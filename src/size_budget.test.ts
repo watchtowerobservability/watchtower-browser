@@ -25,6 +25,11 @@ it("size_budget_core_under_12kib_gz", async () => {
   expect(r.outputFiles[0]!.text).not.toContain("cache_storage");
 });
 
+it("errors_entry_under_2_5kib_gz", async () => {
+  const r = await build({ entryPoints: ["src/errors.ts"], bundle: true, minify: true, format: "esm", target: "es2020", write: false });
+  expect(gzipSync(r.outputFiles[0]!.contents, { level: 9 }).length).toBeLessThan(2.5 * 1024);
+});
+
 it("rum_bundle_under_35kib_gz", async () => {
   const r = await build({
     entryPoints: ["src/index.ts", "src/instrument/index.ts"],

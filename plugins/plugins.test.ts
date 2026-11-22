@@ -46,25 +46,49 @@ describe("upload", () => {
 
   it("upload_failure_does_not_fail_build_by_default", async () => {
     const { path } = await mapFile();
-    const bad = vi.fn(() => Promise.resolve(new Response("no", { status: 500 })));
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const bad = vi.fn(() => Promise.resolve(new Response("no", { status: 400 })));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.stubEnv("CI", "true"); // CI no longer changes the default
     const o = { api: "https://a", project: "p", apiKey: "k", release: "r", fetch: bad as never };
-    vi.stubEnv("CI", ""); // the default is warn-only when not in CI; the runner sets CI=true, so pin it for this case
     await expect(uploadMaps(o, [["app.js.map", path]])).resolves.toBeUndefined();
-    await expect(uploadMaps({ ...o, failOnError: true }, [["app.js.map", path]])).rejects.toThrow(/upload failed/);
+    expect(warn).toHaveBeenCalled();
+    await expect(uploadMaps({ ...o, failOnError: true }, [["app.js.map", path]])).rejects.toThrow(/release r: HTTP 400|upload failed/);
+    vi.unstubAllEnvs();
   });
 
-  it("fail_on_error_defaults_true_in_ci", async () => {
+  it("retries_429_and_5xx_with_retry_after_then_succeeds", async () => {
     const { path } = await mapFile();
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const bad = vi.fn(() => Promise.resolve(new Response("no", { status: 500 })));
-    const o = { api: "https://a", project: "p", apiKey: "k", release: "r", fetch: bad as never };
-    vi.stubEnv("CI", "true");
-    await expect(uploadMaps(o, [["app.js.map", path]])).rejects.toThrow(/upload failed/);
-    await expect(uploadMaps({ ...o, failOnError: false }, [["app.js.map", path]])).resolves.toBeUndefined();
-    vi.stubEnv("CI", "");
-    await expect(uploadMaps(o, [["app.js.map", path]])).resolves.toBeUndefined();
-    vi.unstubAllEnvs();
+    let n = 0;
+    const f = vi.fn((url: string) => {
+      if (!String(url).includes("/artifacts")) return Promise.resolve(new Response("{}", { status: 201 }));
+      n++;
+      return Promise.resolve(n === 1 ? new Response("", { status: 429, headers: { "Retry-After": "0.001" } }) : n === 2 ? new Response("", { status: 503 }) : new Response("{}", { status: 201 }));
+    });
+    await uploadMaps({ api: "https://a", project: "p", apiKey: "k", release: "r", retryDelayMs: 1, failOnError: true, fetch: f as never }, [["app.js.map", path]]);
+    expect(n).toBe(3);
+    await expect(access(path)).rejects.toThrow(); // deleted after the successful retry
+  });
+
+  it("gives_up_after_4_retries", async () => {
+    const { path } = await mapFile();
+    let n = 0;
+    const f = vi.fn((url: string) => (String(url).includes("/artifacts") ? (n++, Promise.resolve(new Response("", { status: 500 }))) : Promise.resolve(new Response("{}", { status: 201 }))));
+    await expect(uploadMaps({ api: "https://a", project: "p", apiKey: "k", release: "r", retryDelayMs: 0, failOnError: true, fetch: f as never }, [["app.js.map", path]])).rejects.toThrow(/HTTP 500/);
+    expect(n).toBe(5);
+  });
+
+  it("uploads_with_at_most_4_in_flight", async () => {
+    const files = await Promise.all([1, 2, 3, 4, 5, 6, 7, 8, 9].map(mapFile));
+    let cur = 0, max = 0;
+    const f = vi.fn(async (url: string) => {
+      if (!String(url).includes("/artifacts")) return new Response("{}", { status: 201 });
+      max = Math.max(max, ++cur);
+      await new Promise((r) => setTimeout(r, 5));
+      cur--;
+      return new Response("{}", { status: 201 });
+    });
+    await uploadMaps({ api: "https://a", project: "p", apiKey: "k", release: "r", fetch: f as never }, files.map((x, i): [string, string] => [`m${i}.map`, x.path]));
+    expect(max).toBe(4);
   });
 
   it("delete_sourcemaps_after_upload", async () => {

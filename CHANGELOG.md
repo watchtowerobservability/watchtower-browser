@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 (2026-11-19)
+
+- New `@watchtowerobservability/browser/errors` entry (`dist/errors.js`, under 2.5 KB gzipped): `initErrors({ endpoint, publishableKey, release?, environment?, service?, maxEvents = 50 })` and `captureError(err)`. It needs no consent: no cookies, no localStorage or sessionStorage, no session or user id, nothing queued. Each error (message, type, parsed stack frames, page URL without query, release, capture-time timestamp) is one `fetch` POST (`keepalive`, `text/plain`, key in `?k=`, so no CORS preflight). At most `maxEvents` per page; identical message+stack is sent once. When the full client starts later (after `grantConsent()`), it takes over: the entry removes its listeners and forwards `captureError` to the full client, so nothing is reported twice.
+- Fix: with `consent: "pending"`, calls held until `grantConsent()` keep the timestamp of the original call instead of the replay time (events and logs).
+- A request refused with 403 `origin_not_allowed` (`/v1/rum/config`, `/v1/rum/events`) now logs one console warning per page load, even without `debug`, naming the origin and saying to add it to the publishable key's origins or enable `allow_localhost` for development.
+- Fix: the build now emits `dist/lite.d.ts` (the `./lite` types target was missing from the tarball). Every `types` target in `exports` is produced by the build.
+- Fix: `./vite-plugin`, `./rollup-plugin` and `./webpack-plugin` ship `.d.ts` (`dist/plugins/*.d.ts`) and a `types` condition; no more TS7016.
+- `urlScrubbing` accepts `{ preset: "strict" | "pii" | "off", allow?, deny? }`: a preset plus your own rules. The old forms still work.
+- Bundler plugins: source map uploads retry up to 4 times on 429, 5xx and network errors (exponential backoff, `Retry-After` honoured), at most 4 uploads in flight. Behaviour change: `failOnError` now defaults to false everywhere (it was true when `$CI` was set); a failed upload logs a warning. For maps written by later build steps use `wtctl sourcemaps upload`.
+
 ## 0.5.8 (2026-11-16)
 
 - Fix: `propagateTo` without `otlpEndpoint` injected no `traceparent` (tracing was off). It now sends spans to `endpoint` (the edge, or your tunnel), which accepts `/v1/traces` for publishable keys. `otlpEndpoint` still wins when set. If no endpoint is usable, one console warning explains.

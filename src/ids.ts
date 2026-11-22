@@ -24,3 +24,7 @@ export async function hashUserId(id: string, salt: string): Promise<string | und
   const d = await subtle.digest("SHA-256", new TextEncoder().encode(`${salt}:${id}`));
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
+
+/** Set while held (consent "pending") calls replay, so they keep the time they were made, not the replay time. */
+export const clock = { at: 0 };
+export const nowMs = (): number => clock.at || Date.now();

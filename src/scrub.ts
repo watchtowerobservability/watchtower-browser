@@ -3,13 +3,14 @@ let allow: RegExp[] = [];
 let deny: RegExp[] = [];
 
 /** `'strict'` (= `true`, the default), `'pii'` (strict plus emails, phone numbers, card numbers, IPv4 in path segments), `'off'` (= `false`). Same names as the node SDK's `redact`. */
-export type UrlScrubbing = boolean | "strict" | "pii" | "off" | { allow?: RegExp[]; deny?: RegExp[] };
+export type UrlScrubbing = boolean | "strict" | "pii" | "off" | { preset?: "strict" | "pii" | "off"; allow?: RegExp[]; deny?: RegExp[] };
 let pii = false;
 
-/** `urlScrubbing: false` keeps query strings and path ids (the fragment is always dropped); `{ allow, deny }` are tested against each path segment (deny wins). Set by `init` and by the lazy instrument chunk. */
+/** `urlScrubbing: false` keeps query strings and path ids (the fragment is always dropped); `{ preset?, allow, deny }` (a preset plus your own rules) are tested against each path segment (deny wins). Set by `init` and by the lazy instrument chunk. */
 export function setUrlScrubbing(v: UrlScrubbing | undefined): void {
-  on = v !== false && v !== "off";
-  pii = v === "pii";
+  const preset = typeof v === "object" ? v.preset : v;
+  on = preset !== false && preset !== "off";
+  pii = preset === "pii";
   allow = typeof v === "object" ? (v.allow ?? []) : [];
   deny = typeof v === "object" ? (v.deny ?? []) : [];
 }

@@ -42,6 +42,20 @@ async function encode(body: string): Promise<{ data: BodyInit; gzip: boolean }> 
   return { data: body, gzip: false };
 }
 
+let originWarned = false;
+/** A 403 `origin_not_allowed` from the edge: one console warning per page load (not gated by `debug`). */
+export async function warnOrigin(r: Response): Promise<void> {
+  if (originWarned || r.status !== 403) return;
+  try {
+    const j = (await r.clone().json()) as { error?: string; origin?: string };
+    if (j.error !== "origin_not_allowed") return;
+    originWarned = true;
+    console.warn(`[watchtower] origin ${j.origin ?? location.origin} is not allowed for this publishable key: add it to the key's origins, or enable allow_localhost for local development.`);
+  } catch {
+    /* not our JSON body */
+  }
+}
+
 export class Transport {
   readonly queue = new BoundedQueue<RumEventV1>(LIMITS.queueMax);
   private started = false;
@@ -128,6 +142,7 @@ export class Transport {
         },
       });
       if (this.discarded) return;
+      void warnOrigin(r);
       this.handle(r.status, r.headers?.get("Retry-After") ?? null, batch);
     } catch {
       if (!this.discarded) await this.park(batch);
