@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { trackRoute } from "./router";
+import { trackRoute } from "./router.js";
 
 /** Next app router: `useNextRouteTracking(usePathname(), useParams())` from `next/navigation`. */
 export function useNextRouteTracking(pathname: string | null, params?: Record<string, string | string[] | undefined>): void {

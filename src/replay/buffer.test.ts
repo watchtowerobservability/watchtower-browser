@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RingBuffer } from "./buffer";
+import { RingBuffer } from "./buffer.js";
 
 const ev = (ts: number) => ({ type: 3, timestamp: ts, data: {} });
 

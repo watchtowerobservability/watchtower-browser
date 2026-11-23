@@ -1,14 +1,14 @@
-import type { Attrs, RumEventV1, WatchtowerConfig } from "../config";
-import type { LogLevel } from "../logs";
-import type { Ctx, NavInfo, Uninstall } from "./ctx";
-import { installConsole } from "./console";
-import { installErrors } from "./errors";
-import { installFrustration } from "./frustration";
-import { installLongTasks } from "./longtasks";
-import { currentRoute, installNavigation } from "./navigation";
-import { installResources } from "./resources";
-import { installVitals } from "./vitals";
-import { setUrlScrubbing } from "../scrub";
+import type { Attrs, RumEventV1, WatchtowerConfig } from "../config.js";
+import type { LogLevel } from "../logs.js";
+import type { Ctx, NavInfo, Uninstall } from "./ctx.js";
+import { installConsole } from "./console.js";
+import { installErrors } from "./errors.js";
+import { installFrustration } from "./frustration.js";
+import { installLongTasks } from "./longtasks.js";
+import { currentRoute, installNavigation } from "./navigation.js";
+import { installResources } from "./resources.js";
+import { installVitals } from "./vitals.js";
+import { setUrlScrubbing } from "../scrub.js";
 
 export interface InstallOpts {
   cfg: WatchtowerConfig;
@@ -19,7 +19,7 @@ export interface InstallOpts {
   /** local `profiling` option, overridden by remote config; read live */
   profilingEnabled?(): boolean;
   setAttribute?(k: string, v: string): void;
-  onVital?(v: import("../config").WtVital): void;
+  onVital?(v: import("../config.js").WtVital): void;
   /** called whenever tracing sets the active view span */
   onSpan?(s: { trace_id: string; span_id: string } | undefined): void;
 }
@@ -79,7 +79,7 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
   };
 
   // tracing first, so the document-load span exists before the first events
-  await addAsync(async () => (await import("./tracing")).installTracing(ctx));
+  await addAsync(async () => (await import("./tracing.js")).installTracing(ctx));
   add(() => installNavigation(ctx, listeners));
   add(() => installErrors(ctx));
   add(() => installConsole(ctx));
@@ -88,11 +88,11 @@ export async function install(o: InstallOpts): Promise<Uninstall> {
   add(() => installFrustration(ctx));
   await addAsync(() => installVitals(ctx));
   // opt-in, its own lazy chunk: nothing is fetched or patched without the `storage` option
-  if (cfg.storage) await addAsync(async () => (await import("./storage")).installStorage(ctx));
+  if (cfg.storage) await addAsync(async () => (await import("./storage.js")).installStorage(ctx));
   const enabled = o.profilingEnabled;
   if (enabled?.()) {
     await addAsync(async () =>
-      (await import("../profiling")).installProfiling(ctx, { enabled, setAttr: (k, v) => o.setAttribute?.(k, v) }),
+      (await import("../profiling/index.js")).installProfiling(ctx, { enabled, setAttr: (k, v) => o.setAttribute?.(k, v) }),
     );
   }
   return () => undo.forEach((u) => u());

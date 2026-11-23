@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { installConsole } from "./console";
-import { mkCtx } from "./testutil";
+import { installConsole } from "./console.js";
+import { mkCtx } from "./testutil.js";
 
 let un: (() => void) | undefined;
 afterEach(() => un?.());

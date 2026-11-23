@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installErrors, parseStack } from "./errors";
-import { mkCtx } from "./testutil";
+import { installErrors, parseStack } from "./errors.js";
+import { mkCtx } from "./testutil.js";
 
 const V8_STACK = `TypeError: x is undefined
     at inner (https://cdn.x.test/app.js:10:5)

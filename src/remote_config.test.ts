@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchRemoteConfig } from "./remote_config";
+import { fetchRemoteConfig } from "./remote_config.js";
 
 describe("remote config", () => {
   it("remote_config_failure_defaults_replay_off", async () => {

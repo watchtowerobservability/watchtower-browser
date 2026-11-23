@@ -50,7 +50,7 @@ export const DEFAULT_LABELS: AssistLabels = {
   end: "End session",
 };
 
-import { effectiveLevel, type MaskLevel } from "./replay/config";
+import { effectiveLevel, type MaskLevel } from "./replay/config.js";
 
 export interface MaskRules {
   strict: boolean;

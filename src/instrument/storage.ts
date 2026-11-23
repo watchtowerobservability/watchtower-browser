@@ -1,5 +1,5 @@
-import type { Attrs, StorageConfig } from "../config";
-import type { Ctx, Uninstall } from "./ctx";
+import type { Attrs, StorageConfig } from "../config.js";
+import type { Ctx, Uninstall } from "./ctx.js";
 
 /** Sync work on the main thread over one frame is jank. */
 export const FRAME_MS = 16;

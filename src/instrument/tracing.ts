@@ -5,12 +5,12 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { XMLHttpRequestInstrumentation } from "@opentelemetry/instrumentation-xml-http-request";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor, WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import { LIMITS, type Matcher, type WatchtowerConfig } from "../config";
-import { posthogAttrs } from "../posthog";
-import { ActionContextManager, installUserActions } from "./actions";
-import { scrubSpanAttrs } from "../scrub";
-import { warnOnRefusal } from "./export-warn";
-import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx";
+import { LIMITS, type Matcher, type WatchtowerConfig } from "../config.js";
+import { posthogAttrs } from "../posthog.js";
+import { ActionContextManager, installUserActions } from "./actions.js";
+import { scrubSpanAttrs } from "../scrub.js";
+import { warnOnRefusal } from "./export-warn.js";
+import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx.js";
 
 /** Same-origin is deliberately not implicit; the Watchtower endpoints never get a trace header. */
 export function shouldPropagate(url: string, cfg: WatchtowerConfig, isOwn: (u: string) => boolean): boolean {

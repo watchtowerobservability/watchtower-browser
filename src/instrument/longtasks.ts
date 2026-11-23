@@ -1,4 +1,4 @@
-import type { Ctx, Uninstall } from "./ctx";
+import type { Ctx, Uninstall } from "./ctx.js";
 
 const MIN_MS = 50;
 const MAX_PER_VIEW = 20;

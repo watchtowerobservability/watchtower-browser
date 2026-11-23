@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { init, syntheticAttrs } from "./index";
-import { bodyOf, stubFetch } from "./testutil";
+import { init, syntheticAttrs } from "./index.js";
+import { bodyOf, stubFetch } from "./testutil.js";
 
 const cfg = { publishableKey: "wtp_abcd1234_x", endpoint: "https://edge.test", service: "web" };
 beforeEach(() => sessionStorage.clear());

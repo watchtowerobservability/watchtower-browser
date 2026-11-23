@@ -8,30 +8,30 @@ import {
   type WatchtowerConfig,
   type WtErrorEvent,
   type WtVital,
-} from "./config";
-import { clock, hashUserId, nowMs, rand, uuid } from "./ids";
-import { lucidaAttrs } from "./lucida";
-import { scrubUrl, setUrlScrubbing, stripQuery } from "./scrub";
-import { posthogAttrs, registerSession } from "./posthog";
-import type { Uninstall } from "./instrument/ctx";
-import { makeFlagRecorder } from "./instrument/flags";
-import { makeJourney, type Journey } from "./instrument/journeys";
-import { fetchRemoteConfig } from "./remote_config";
-import type { ReplayHandle } from "./replay";
-import type { MaskLevel } from "./replay/config";
-import { LogShipper, type LogLevel } from "./logs";
-import { chunkFailed } from "./chunk-error";
-import { deleteOfflineDbs, idbStore } from "./queue";
-import { Session } from "./session";
-import { Transport, type Envelope } from "./transport";
+} from "./config.js";
+import { clock, hashUserId, nowMs, rand, uuid } from "./ids.js";
+import { lucidaAttrs } from "./lucida.js";
+import { scrubUrl, setUrlScrubbing, stripQuery } from "./scrub.js";
+import { posthogAttrs, registerSession } from "./posthog.js";
+import type { Uninstall } from "./instrument/ctx.js";
+import { makeFlagRecorder } from "./instrument/flags.js";
+import { makeJourney, type Journey } from "./instrument/journeys.js";
+import { fetchRemoteConfig } from "./remote_config.js";
+import type { ReplayHandle } from "./replay/index.js";
+import type { MaskLevel } from "./replay/config.js";
+import { LogShipper, type LogLevel } from "./logs.js";
+import { chunkFailed } from "./chunk-error.js";
+import { deleteOfflineDbs, idbStore } from "./queue.js";
+import { Session } from "./session.js";
+import { Transport, type Envelope } from "./transport.js";
 
-export type { WtErrorEvent, WtVital } from "./config";
-export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter, StorageConfig } from "./config";
+export type { WtErrorEvent, WtVital } from "./config.js";
+export type { RumEventV1, WatchtowerConfig, ReplayConfig, FlagAdapter, StorageConfig } from "./config.js";
 
 export type { Journey };
-export type { Feedback, FeedbackWidgetOptions } from "./feedback";
-export { cookieMunchConsent } from "./consent"; // on the `wt.min.js` global too
-export { growthBookAdapter, launchDarklyAdapter, openFeatureHook } from "./instrument/flags";
+export type { Feedback, FeedbackWidgetOptions } from "./feedback.js";
+export { cookieMunchConsent } from "./consent.js"; // on the `wt.min.js` global too
+export { growthBookAdapter, launchDarklyAdapter, openFeatureHook } from "./instrument/flags.js";
 
 export interface WatchtowerClient {
   captureError(err: unknown, ctx?: Attrs): void;
@@ -59,9 +59,9 @@ export interface WatchtowerClient {
   replay: { start(): void; stop(): void; flush(): Promise<void> };
   sessionId(): string;
   /** Send user feedback, linked to the last captured error, the session and its replay (ERR-014). */
-  feedback(f: import("./feedback").Feedback): Promise<boolean>;
+  feedback(f: import("./feedback.js").Feedback): Promise<boolean>;
   /** Add the opt-in feedback button and dialog; with `openOnError` it also asks after an error. */
-  feedbackWidget(o?: import("./feedback").FeedbackWidgetOptions): void;
+  feedbackWidget(o?: import("./feedback.js").FeedbackWidgetOptions): void;
   shutdown(): Promise<void>;
   /** Start the SDK after `init({ consent: "pending" })`; a no-op while already running. */
   grantConsent(): void;
@@ -394,7 +394,7 @@ function build(cfg: WatchtowerConfig): Built {
     });
 
   // Dynamic probes: a lazy chunk, only fetched when `probes.key` is configured.
-  let probes: Promise<import("./probes").Probes | undefined> | undefined;
+  let probes: Promise<import("./probes.js").Probes | undefined> | undefined;
   const probe = safe((name: string, vars: () => Record<string, unknown>) => {
     if (!cfg.probes) return;
     probes ??= ready
@@ -425,7 +425,7 @@ function build(cfg: WatchtowerConfig): Built {
   }, undefined, d);
 
   // User feedback: a lazy chunk, fetched on the first `feedback` or `feedbackWidget` call.
-  type FeedbackMod = typeof import("./feedback");
+  type FeedbackMod = typeof import("./feedback.js");
   let feedbackMod: Promise<FeedbackMod> | undefined;
   const loadFeedback = (): Promise<FeedbackMod> =>
     (feedbackMod ??= chunk(cfg.feedback?.scriptUrl, "feedback.js", () => import("./feedback.js")));
@@ -482,7 +482,7 @@ function build(cfg: WatchtowerConfig): Built {
     },
     sessionId: safe(() => session.id(), "", d),
     feedback: (f) => Promise.resolve().then(loadFeedback).then((m) => m.sendFeedback(feedbackCtx, f)).catch(() => false),
-    feedbackWidget: safe((o?: import("./feedback").FeedbackWidgetOptions) => {
+    feedbackWidget: safe((o?: import("./feedback.js").FeedbackWidgetOptions) => {
       void loadFeedback().then((m) => {
         if (stopped) return;
         const w = m.mountWidget(feedbackCtx, o);

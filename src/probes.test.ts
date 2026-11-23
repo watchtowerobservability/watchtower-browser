@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { capture, compile, createProbes, type ProbeDef } from "./probes";
+import { capture, compile, createProbes, type ProbeDef } from "./probes.js";
 
 const def = (over: Partial<ProbeDef> = {}): ProbeDef => ({
   id: "prb_1", kind: "snapshot", location: { function: "pay" }, condition: "", message: "",

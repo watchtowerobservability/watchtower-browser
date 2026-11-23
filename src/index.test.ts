@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { init as initSdk, type WatchtowerClient } from "./index";
-import { bodyOf, stubFetch } from "./testutil";
+import { init as initSdk, type WatchtowerClient } from "./index.js";
+import { bodyOf, stubFetch } from "./testutil.js";
 
 const cfg = { publishableKey: "wtp_abcd1234_x", endpoint: "https://edge.test", service: "web" };
 
@@ -27,14 +27,14 @@ async function sent(f: ReturnType<typeof stubFetch>) {
 describe("lucida link", () => {
   it("lucida_session_id_attached_when_present", async () => {
     (globalThis as any).lucida = { getSessionId: () => "ls1" };
-    const { lucidaAttrs } = await import("./lucida");
+    const { lucidaAttrs } = await import("./lucida.js");
     expect(lucidaAttrs()["lucida.session_id"]).toBe("ls1");
     delete (globalThis as any).lucida;
     expect(lucidaAttrs()).toEqual({});
   });
 
   it("lucida_getter_resolved_lazily", async () => {
-    const { lucidaAttrs } = await import("./lucida");
+    const { lucidaAttrs } = await import("./lucida.js");
     let c: { getSessionId: () => string } | undefined;
     const get = () => c;
     expect(lucidaAttrs(get)).toEqual({});
@@ -44,14 +44,14 @@ describe("lucida link", () => {
 
   it("lucida_distinct_id_attached_when_present", async () => {
     (globalThis as any).lucida = { getSessionId: () => "ls1", getDistinctId: () => "u-7" };
-    const { lucidaAttrs } = await import("./lucida");
+    const { lucidaAttrs } = await import("./lucida.js");
     expect(lucidaAttrs()).toEqual({ "lucida.session_id": "ls1", "lucida.distinct_id": "u-7" });
     delete (globalThis as any).lucida;
   });
 
   it("init_lucida_client_wins_over_the_global", async () => {
     (globalThis as any).lucida = { getSessionId: () => "global" };
-    const { lucidaAttrs } = await import("./lucida");
+    const { lucidaAttrs } = await import("./lucida.js");
     expect(lucidaAttrs({ getSessionId: () => "mine" })["lucida.session_id"]).toBe("mine");
     expect(lucidaAttrs({ getSessionId: () => "" })["lucida.session_id"]).toBe("global");
     delete (globalThis as any).lucida;
@@ -96,7 +96,7 @@ describe("default release", () => {
     expect((await sent(f)).app.release).toBe("1.2.3");
     s.remove();
     (globalThis as { __WT_RELEASE__?: string }).__WT_RELEASE__ = "9.9.9";
-    const { defaultRelease } = await import("./config");
+    const { defaultRelease } = await import("./config.js");
     expect(defaultRelease()).toBe("9.9.9");
   });
   it("explicit_release_wins", async () => {
@@ -221,7 +221,7 @@ describe("urls and tunnel", () => {
 
 describe("url scrubbing slugs and rules", () => {
   it("keeps_kebab_slugs_redacts_tokens_and_honours_allow_deny", async () => {
-    const { redactPath, setUrlScrubbing } = await import("./scrub");
+    const { redactPath, setUrlScrubbing } = await import("./scrub.js");
     setUrlScrubbing(undefined);
     expect(redactPath("/gallery/legal-consultation-intake")).toBe("/gallery/legal-consultation-intake");
     expect(redactPath("/x/Xk29dLq0aPz7Xk29dLq0aPz7")).toBe("/x/:redacted");

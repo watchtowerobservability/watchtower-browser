@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installFrustration } from "./frustration";
-import { mkCtx } from "./testutil";
+import { installFrustration } from "./frustration.js";
+import { mkCtx } from "./testutil.js";
 
 let un: (() => void) | undefined;
 let btn: HTMLElement;

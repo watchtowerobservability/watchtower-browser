@@ -13,7 +13,7 @@ it("errors_sends_simple_post_dedupes_caps_stores_nothing_and_hands_off", async (
   vi.resetModules();
   const calls: Array<[string, RequestInit]> = [];
   vi.stubGlobal("fetch", vi.fn(async (u: string, i: RequestInit) => (calls.push([u, i]), new Response(null, { status: 202 }))));
-  const { initErrors, captureError } = await import("./errors");
+  const { initErrors, captureError } = await import("./errors.js");
   initErrors({ endpoint: "https://e.example/", publishableKey: "wtp_k", release: "r1", maxEvents: 3 });
   const err = (m: string, stack: string) => window.dispatchEvent(new ErrorEvent("error", { message: m, error: { name: "TypeError", message: m, stack } }));
   err("a", "TypeError: a\n    at f (https://x.test/a.js?v=1:3:4)\n    at https://x.test/b.js:5:6");

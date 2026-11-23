@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { init as initSdk, type WatchtowerClient, type WtErrorEvent } from "./index";
-import { bodyOf, stubFetch } from "./testutil";
+import { init as initSdk, type WatchtowerClient, type WtErrorEvent } from "./index.js";
+import { bodyOf, stubFetch } from "./testutil.js";
 
 const cfg = { publishableKey: "wtp_abcd1234_x", endpoint: "https://edge.test", service: "web" };
 const live: WatchtowerClient[] = [];

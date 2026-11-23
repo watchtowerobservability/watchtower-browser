@@ -1,5 +1,5 @@
-import type { Attrs, Matcher, RumEventV1, WatchtowerConfig, WtVital } from "../config";
-import type { LogLevel } from "../logs";
+import type { Attrs, Matcher, RumEventV1, WatchtowerConfig, WtVital } from "../config.js";
+import type { LogLevel } from "../logs.js";
 
 export interface NetInfo {
   status?: number;
@@ -38,8 +38,8 @@ export type Uninstall = () => void;
 export const matches = (m: Matcher, url: string): boolean =>
   typeof m === "string" ? url.startsWith(m) : m.test(url);
 
-export { scrubScriptUrl, scrubUrl, stripQuery } from "../scrub";
-import { stripQuery } from "../scrub";
+export { scrubScriptUrl, scrubUrl, stripQuery } from "../scrub.js";
+import { stripQuery } from "../scrub.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID_SEG = /^(\d+|[0-9a-f]{16,})$/i;

@@ -1,4 +1,4 @@
-import { REPLAY_LIMITS, type ReplayPlugin } from "./config";
+import { REPLAY_LIMITS, type ReplayPlugin } from "./config.js";
 
 const ALWAYS_DROP = /^(authorization|cookie|set-cookie)$/i;
 type Level = "log" | "info" | "warn" | "error";

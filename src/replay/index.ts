@@ -1,13 +1,13 @@
 import { record } from "rrweb";
-import { RingBuffer } from "./buffer";
-import { Chunker, type StopReason } from "./chunker";
-import { canvasAllowed, videoFramePlugin } from "./canvas";
-import { effectiveLevel, REPLAY_LIMITS, type MaskLevel, type ReplayConfig, type ReplayRemote, type RrEvent } from "./config";
-import { buildRecordOptions, Sanitizer } from "./privacy";
-import { RouteGuard } from "./routes";
+import { RingBuffer } from "./buffer.js";
+import { Chunker, type StopReason } from "./chunker.js";
+import { canvasAllowed, videoFramePlugin } from "./canvas.js";
+import { effectiveLevel, REPLAY_LIMITS, type MaskLevel, type ReplayConfig, type ReplayRemote, type RrEvent } from "./config.js";
+import { buildRecordOptions, Sanitizer } from "./privacy.js";
+import { RouteGuard } from "./routes.js";
 
-export * from "./plugins";
-export type { ReplayConfig, ReplayPlugin, RrEvent } from "./config";
+export * from "./plugins.js";
+export type { ReplayConfig, ReplayPlugin, RrEvent } from "./config.js";
 
 export interface ReplayDeps {
   cfg: ReplayConfig;

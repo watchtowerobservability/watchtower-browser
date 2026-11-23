@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { warnOnRefusal } from "./export-warn";
+import { warnOnRefusal } from "./export-warn.js";
 
 type Res = { error?: unknown };
 const fake = (code: number) => ({ export: (_s: never, cb: (r: Res) => void) => cb({ error: { code } }) });

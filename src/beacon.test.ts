@@ -1,7 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
 import { expect, it, vi } from "vitest";
-import { init } from "./beacon";
+import { init } from "./beacon.js";
 
 it("beacon_min_under_2kib_gz", async () => {
   const r = await build({ entryPoints: ["src/beacon.ts"], bundle: true, minify: true, format: "iife", target: "es2020", write: false });

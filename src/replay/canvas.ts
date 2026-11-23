@@ -1,4 +1,4 @@
-import type { MaskLevel, ReplayPlugin } from "./config";
+import type { MaskLevel, ReplayPlugin } from "./config.js";
 
 const BLOCKED = ".wt-block, [data-wt-block]";
 const FRAME_MAX_W = 320;

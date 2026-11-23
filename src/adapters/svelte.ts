@@ -1,4 +1,4 @@
-import { trackRoute } from "./router";
+import { trackRoute } from "./router.js";
 
 /** SvelteKit: in the root layout, `afterNavigate((n) => trackSvelteKit(n.to))` (`$app/navigation`).
  * `route.id` is already a template (`/users/[id]`); it is rewritten to `/users/:id`. */

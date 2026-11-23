@@ -1,4 +1,4 @@
-import type { Attrs } from "./config";
+import type { Attrs } from "./config.js";
 
 interface PostHogLike {
   get_distinct_id?: () => string;

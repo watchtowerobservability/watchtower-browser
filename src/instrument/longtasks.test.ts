@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { installLongTasks } from "./longtasks";
-import { mkCtx } from "./testutil";
+import { installLongTasks } from "./longtasks.js";
+import { mkCtx } from "./testutil.js";
 
 afterEach(() => vi.unstubAllGlobals());
 

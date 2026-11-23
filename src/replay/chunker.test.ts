@@ -1,7 +1,7 @@
 import { gzipSync, strToU8 } from "fflate";
 import { describe, expect, it, vi } from "vitest";
-import { Chunker } from "./chunker";
-import { chunkFetch } from "./harness";
+import { Chunker } from "./chunker.js";
+import { chunkFetch } from "./harness.js";
 
 const ev = (n: number, pad = 0) => ({ type: 3, timestamp: n, data: { source: 1, pad: "x".repeat(pad) } });
 const mk = (f: ReturnType<typeof chunkFetch>, over: object = {}) =>

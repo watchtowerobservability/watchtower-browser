@@ -1,5 +1,5 @@
-import type { LogLevel } from "../logs";
-import type { Ctx, Uninstall } from "./ctx";
+import type { LogLevel } from "../logs.js";
+import type { Ctx, Uninstall } from "./ctx.js";
 
 type Level = LogLevel;
 

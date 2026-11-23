@@ -1,6 +1,6 @@
 import { gzipSync, strToU8 } from "fflate";
-import { SDK } from "../config";
-import { REPLAY_LIMITS, type MaskLevel, type RrEvent } from "./config";
+import { SDK } from "../config.js";
+import { REPLAY_LIMITS, type MaskLevel, type RrEvent } from "./config.js";
 
 export type StopReason = "disabled" | "session_cap" | "floor";
 

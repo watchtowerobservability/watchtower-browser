@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RumEventV1 } from "./config";
-import { MemoryStore } from "./queue";
-import { Transport, type Envelope } from "./transport";
+import type { RumEventV1 } from "./config.js";
+import { MemoryStore } from "./queue.js";
+import { Transport, type Envelope } from "./transport.js";
 
 const env = (): Envelope => ({
   session_id: "s", sent_at_ns: 1, sdk: { name: "t", version: "0" }, app: { service: "web" },

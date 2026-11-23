@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resourceEvent } from "./resources";
-import { mkCtx } from "./testutil";
+import { resourceEvent } from "./resources.js";
+import { mkCtx } from "./testutil.js";
 
 const entry = (name: string, extra = {}) => ({
   name,

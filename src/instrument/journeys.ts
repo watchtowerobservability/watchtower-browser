@@ -1,4 +1,4 @@
-import type { Attrs } from "../config";
+import type { Attrs } from "../config.js";
 
 type Emit = (name: string, attrs: Attrs) => void;
 

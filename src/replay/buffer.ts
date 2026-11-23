@@ -1,4 +1,4 @@
-import { REPLAY_LIMITS, type RrEvent } from "./config";
+import { REPLAY_LIMITS, type RrEvent } from "./config.js";
 
 interface Seg {
   events: RrEvent[];

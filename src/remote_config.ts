@@ -1,5 +1,5 @@
-import { DEFAULT_REMOTE, LIMITS, type RemoteConfig } from "./config";
-import { warnOrigin } from "./transport";
+import { DEFAULT_REMOTE, LIMITS, type RemoteConfig } from "./config.js";
+import { warnOrigin } from "./transport.js";
 
 /** Fetch `/v1/rum/config` with a 2 s timeout; any failure yields the safe defaults (RUM on, replay off). */
 export async function fetchRemoteConfig(

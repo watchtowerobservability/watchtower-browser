@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { growthBookAdapter, launchDarklyAdapter, makeFlagRecorder, openFeatureHook } from "./flags";
+import { growthBookAdapter, launchDarklyAdapter, makeFlagRecorder, openFeatureHook } from "./flags.js";
 
 function rec() {
   const events: Array<[string, Record<string, unknown>]> = [];

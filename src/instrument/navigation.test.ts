@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trackRoute } from "../adapters/router";
-import { normalizeRoute } from "./ctx";
-import { installNavigation, setRoute } from "./navigation";
-import { mkCtx } from "./testutil";
+import { trackRoute } from "../adapters/router.js";
+import { normalizeRoute } from "./ctx.js";
+import { installNavigation, setRoute } from "./navigation.js";
+import { mkCtx } from "./testutil.js";
 
 let un: (() => void) | undefined;
 afterEach(() => {
@@ -84,9 +84,9 @@ describe("navigation", () => {
   it("two_bundled_copies_share_the_route", async () => {
     // dist/adapters and dist/instrument each bundle navigation.ts; the adapter's copy must reach the instrument's (W-30)
     vi.resetModules();
-    const a = await import("./navigation");
+    const a = await import("./navigation.js");
     vi.resetModules();
-    const b = await import("./navigation");
+    const b = await import("./navigation.js");
     expect(a).not.toBe(b);
     a.setRoute("/gallery/:typeId");
     expect(b.currentRoute()).toBe("/gallery/:typeId");

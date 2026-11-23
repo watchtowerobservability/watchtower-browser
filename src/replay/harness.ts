@@ -1,7 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import { vi } from "vitest";
-import type { MaskLevel, ReplayConfig } from "./config";
-import { startReplay, type ReplayDeps } from "./index";
+import type { MaskLevel, ReplayConfig } from "./config.js";
+import { startReplay, type ReplayDeps } from "./index.js";
 
 export interface Posted {
   url: string;

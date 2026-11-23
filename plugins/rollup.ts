@@ -1,5 +1,5 @@
-import { injectDebugId } from "./debugid";
-import { uploadMaps, type UploadOptions } from "./upload";
+import { injectDebugId } from "./debugid.js";
+import { uploadMaps, type UploadOptions } from "./upload.js";
 
 type Bundle = Record<string, { type: string; code?: string; source?: string | Uint8Array }>;
 

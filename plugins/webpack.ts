@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { injectDebugId } from "./debugid";
-import { uploadMaps, type UploadOptions } from "./upload";
+import { injectDebugId } from "./debugid.js";
+import { uploadMaps, type UploadOptions } from "./upload.js";
 
 /** webpack 5: `plugins: [new WatchtowerWebpackPlugin({ api, project })]` with `devtool: "source-map"`. */
 export class WatchtowerWebpackPlugin {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mkCtx } from "./testutil";
-import { rate, vitalAttrs } from "./vitals";
+import { mkCtx } from "./testutil.js";
+import { rate, vitalAttrs } from "./vitals.js";
 
 describe("vitals", () => {
   it("vitals_rating_thresholds", () => {

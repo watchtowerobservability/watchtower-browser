@@ -1,5 +1,5 @@
-import type { RumEventV1 } from "../config";
-import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx";
+import type { RumEventV1 } from "../config.js";
+import { matches, scrubUrl, type Ctx, type Uninstall } from "./ctx.js";
 
 type Resource = Pick<
   PerformanceResourceTiming,

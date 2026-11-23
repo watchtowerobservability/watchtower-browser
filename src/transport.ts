@@ -1,5 +1,5 @@
-import { LIMITS, type Attrs, type RumEventV1 } from "./config";
-import { BoundedQueue, type OfflineStore } from "./queue";
+import { LIMITS, type Attrs, type RumEventV1 } from "./config.js";
+import { BoundedQueue, type OfflineStore } from "./queue.js";
 
 /** Everything in a `RumBatchV1` except the tenant ids (stamped by the edge) and the events. */
 export interface Envelope {

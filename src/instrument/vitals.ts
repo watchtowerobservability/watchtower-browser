@@ -1,7 +1,7 @@
-import type { Attrs } from "../config";
-import type { WtVital } from "../config";
-import { uuid } from "../ids";
-import { deviceClass, scrubUrl, stripQuery, type Ctx, type Uninstall } from "./ctx";
+import type { Attrs } from "../config.js";
+import type { WtVital } from "../config.js";
+import { uuid } from "../ids.js";
+import { deviceClass, scrubUrl, stripQuery, type Ctx, type Uninstall } from "./ctx.js";
 
 /** Google thresholds: [good upper bound, needs-improvement upper bound]. */
 export const THRESHOLDS: Record<string, [number, number]> = {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { scrubScriptUrl, scrubSpanAttrs, scrubUrl, setUrlScrubbing } from "./scrub";
+import { scrubScriptUrl, scrubSpanAttrs, scrubUrl, setUrlScrubbing } from "./scrub.js";
 
 afterEach(() => setUrlScrubbing(undefined));
 

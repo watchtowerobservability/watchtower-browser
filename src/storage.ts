@@ -4,7 +4,7 @@
  * `storage` option is on (the lazy storage instrument publishes its sink); otherwise they pass through.
  * Statement text and parameters are never recorded: only the operation and first table.
  */
-import { onMainThread, SINK_KEY, type DbOp, type Sink } from "./instrument/storage";
+import { onMainThread, SINK_KEY, type DbOp, type Sink } from "./instrument/storage.js";
 
 const OP = /^\s*(?:with\b[\s\S]*?\)\s*)?([a-z]+)/i;
 const TARGET = /\b(?:from|into|update|join|table)\s+((?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[\w$]+)(?:\.(?:"[^"]+"|[\w$]+))?)/i;

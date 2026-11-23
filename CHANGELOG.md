@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 (2026-11-23)
+
+- Fix: the type declarations now resolve under `moduleResolution: "node16"` / `"nodenext"` (relative imports carry `.js`; before, every import from the package was TS2834/TS2835). The declaration build runs with NodeNext so this cannot regress.
+
 ## 0.6.0 (2026-11-19)
 
 - New `@watchtowerobservability/browser/errors` entry (`dist/errors.js`, under 2.5 KB gzipped): `initErrors({ endpoint, publishableKey, release?, environment?, service?, maxEvents = 50 })` and `captureError(err)`. It needs no consent: no cookies, no localStorage or sessionStorage, no session or user id, nothing queued. Each error (message, type, parsed stack frames, page URL without query, release, capture-time timestamp) is one `fetch` POST (`keepalive`, `text/plain`, key in `?k=`, so no CORS preflight). At most `maxEvents` per page; identical message+stack is sent once. When the full client starts later (after `grantConsent()`), it takes over: the entry removes its listeners and forwards `captureError` to the full client, so nothing is reported twice.

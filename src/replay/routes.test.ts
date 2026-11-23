@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { setup } from "./harness";
-import { RouteGuard } from "./routes";
+import { setup } from "./harness.js";
+import { RouteGuard } from "./routes.js";
 
 afterEach(() => history.replaceState({}, "", "/"));
 

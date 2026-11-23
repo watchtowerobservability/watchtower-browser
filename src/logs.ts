@@ -1,6 +1,6 @@
-import { LIMITS, type Attrs } from "./config";
-import { nowMs } from "./ids";
-import type { OfflineStore } from "./queue";
+import { LIMITS, type Attrs } from "./config.js";
+import { nowMs } from "./ids.js";
+import type { OfflineStore } from "./queue.js";
 
 export type LogLevel = "debug" | "log" | "info" | "warn" | "error";
 

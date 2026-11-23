@@ -1,4 +1,4 @@
-import type { Attrs, FlagAdapter } from "../config";
+import type { Attrs, FlagAdapter } from "../config.js";
 
 const MAX_KEYS = 50;
 const MAX_VALUE = 128;

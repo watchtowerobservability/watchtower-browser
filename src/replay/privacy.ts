@@ -1,5 +1,5 @@
-import { CANVAS_OPTS, canvasAllowed } from "./canvas";
-import type { MaskLevel, ReplayConfig, RrEvent } from "./config";
+import { CANVAS_OPTS, canvasAllowed } from "./canvas.js";
+import type { MaskLevel, ReplayConfig, RrEvent } from "./config.js";
 
 /** Every non-space character becomes `*`, so length class survives but content does not. */
 export const maskText = (s: string): string => s.replace(/\S/g, "*");

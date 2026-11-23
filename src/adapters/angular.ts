@@ -1,4 +1,4 @@
-import { trackRoute } from "./router";
+import { trackRoute } from "./router.js";
 
 interface SnapshotLike {
   routeConfig: { path?: string } | null;

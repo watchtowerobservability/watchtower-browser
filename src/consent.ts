@@ -1,4 +1,4 @@
-import type { WatchtowerClient } from "./index";
+import type { WatchtowerClient } from "./index.js";
 
 /** Cookie Munch categories (`CookieMunch.consent`). */
 export type CookieMunchCategory = "statistics" | "marketing" | "preferences";

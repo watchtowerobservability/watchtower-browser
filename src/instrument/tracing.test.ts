@@ -1,7 +1,7 @@
 import { ROOT_CONTEXT, trace, type Span } from "@opentelemetry/api";
 import { describe, expect, it, vi } from "vitest";
-import { installTracing, makePropagator, otlpFor } from "./tracing";
-import { baseCfg, mkCtx } from "./testutil";
+import { installTracing, makePropagator, otlpFor } from "./tracing.js";
+import { baseCfg, mkCtx } from "./testutil.js";
 
 /** Run the propagator the way the fetch instrumentation does: span in context, carrier = headers. */
 function inject(url: string, propagateTo?: Array<string | RegExp>, lucida?: string, propagateBaggage?: boolean): Record<string, string> {

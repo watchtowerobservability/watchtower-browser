@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RumEventV1 } from "./config";
-import { BoundedQueue } from "./queue";
-import { Transport, type Envelope } from "./transport";
+import type { RumEventV1 } from "./config.js";
+import { BoundedQueue } from "./queue.js";
+import { Transport, type Envelope } from "./transport.js";
 
 const env = (): Envelope => ({
   session_id: "s",

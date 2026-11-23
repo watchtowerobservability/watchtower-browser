@@ -1,4 +1,4 @@
-import type { RrEvent } from "./config";
+import type { RrEvent } from "./config.js";
 
 /** Route exclusion: string = path prefix, RegExp = tested on the path. Checked at start and on each SPA navigation. */
 export class RouteGuard {

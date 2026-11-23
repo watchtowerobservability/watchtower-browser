@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONTROL_IDLE_MS, CONTROL_MAX_MS, limiter, maskRules, run, safeTarget, startAssist, typable, validate, type Command } from "./assist";
+import { CONTROL_IDLE_MS, CONTROL_MAX_MS, limiter, maskRules, run, safeTarget, startAssist, typable, validate, type Command } from "./assist.js";
 
 const relaxed = { strict: false };
 const html = (s: string): HTMLElement => {

@@ -1,6 +1,6 @@
 import { Component, Profiler, createElement, useCallback, useEffect, type ErrorInfo, type ProfilerOnRenderCallback, type ReactNode } from "react";
-import type { WatchtowerClient } from "../index";
-import { trackRoute } from "./router";
+import type { WatchtowerClient } from "../index.js";
+import { trackRoute } from "./router.js";
 
 interface Props {
   client: Pick<WatchtowerClient, "captureError">;

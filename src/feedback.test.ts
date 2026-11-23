@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { feedbackBody, mountWidget, sendFeedback, validShot, type FeedbackCtx } from "./feedback";
+import { feedbackBody, mountWidget, sendFeedback, validShot, type FeedbackCtx } from "./feedback.js";
 
 const ctx = (over: Partial<FeedbackCtx> = {}): FeedbackCtx => ({
   endpoint: "https://e.test/", key: "pk_1", sessionId: () => "s-1",

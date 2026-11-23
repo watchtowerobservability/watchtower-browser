@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { currentRoute, setRoute } from "../instrument/navigation";
-import { WatchtowerErrorBoundary } from "./react";
-import { templateFromParams, trackRoute } from "./router";
-import { trackSvelteKit } from "./svelte";
-import { trackVueRouter } from "./vue";
+import { currentRoute, setRoute } from "../instrument/navigation.js";
+import { WatchtowerErrorBoundary } from "./react.js";
+import { templateFromParams, trackRoute } from "./router.js";
+import { trackSvelteKit } from "./svelte.js";
+import { trackVueRouter } from "./vue.js";
 
 describe("adapters", () => {
   it("react_error_boundary_reports_component_stack", () => {

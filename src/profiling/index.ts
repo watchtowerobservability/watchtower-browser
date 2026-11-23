@@ -1,6 +1,6 @@
-import type { Ctx, Uninstall } from "../instrument/ctx";
-import { toFolded } from "./folded";
-import { profilerCtor, startProfiler, type RunningProfiler } from "./selfprofiler";
+import type { Ctx, Uninstall } from "../instrument/ctx.js";
+import { toFolded } from "./folded.js";
+import { profilerCtor, startProfiler, type RunningProfiler } from "./selfprofiler.js";
 
 export const WINDOW_MS = 10_000;
 export const DEFAULT_SAMPLE = 0.05;

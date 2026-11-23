@@ -1,4 +1,4 @@
-import type { ProfilerTrace } from "./folded";
+import type { ProfilerTrace } from "./folded.js";
 
 export interface RunningProfiler {
   stop(): Promise<ProfilerTrace>;

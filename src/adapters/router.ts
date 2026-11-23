@@ -1,4 +1,4 @@
-import { setRoute } from "../instrument/navigation";
+import { setRoute } from "../instrument/navigation.js";
 
 type Params = Record<string, string | string[] | undefined>;
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { maskBody, networkPlugin, scrubUrl, statePlugin } from "./plugins";
+import { maskBody, networkPlugin, scrubUrl, statePlugin } from "./plugins.js";
 
 afterEach(() => vi.unstubAllGlobals());
 

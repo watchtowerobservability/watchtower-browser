@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { instrumentSqlJs, instrumentWaSqlite, querySummary } from "../storage";
-import type { Uninstall } from "./ctx";
+import { instrumentSqlJs, instrumentWaSqlite, querySummary } from "../storage.js";
+import type { Uninstall } from "./ctx.js";
 import {
   FRAME_MS, installCacheStorage, installIndexedDb, installStorage, installWebStorage, makeSink, sampleSizes, SINK_KEY,
   webStorageBytes, type DbOp,
-} from "./storage";
-import { mkCtx } from "./testutil";
+} from "./storage.js";
+import { mkCtx } from "./testutil.js";
 
 let clock = 0;
 const tick = (ms: number): void => void (clock += ms);

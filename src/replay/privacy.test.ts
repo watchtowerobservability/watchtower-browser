@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { MaskLevel } from "./config";
-import { setup } from "./harness";
-import { buildRecordOptions, Sanitizer, unmaskReport } from "./privacy";
+import type { MaskLevel } from "./config.js";
+import { setup } from "./harness.js";
+import { buildRecordOptions, Sanitizer, unmaskReport } from "./privacy.js";
 
 afterEach(() => {
   document.body.innerHTML = "";

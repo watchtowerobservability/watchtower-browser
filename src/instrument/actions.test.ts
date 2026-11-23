@@ -1,8 +1,8 @@
 import { context, trace } from "@opentelemetry/api";
 import { WebTracerProvider, type Span } from "@opentelemetry/sdk-trace-web";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ACTION_IDLE_MS, ActionContextManager, installUserActions } from "./actions";
-import { mkCtx } from "./testutil";
+import { ACTION_IDLE_MS, ActionContextManager, installUserActions } from "./actions.js";
+import { mkCtx } from "./testutil.js";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());

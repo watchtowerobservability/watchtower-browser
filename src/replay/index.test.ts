@@ -1,8 +1,8 @@
 import { build } from "esbuild";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { effectiveLevel } from "./config";
-import { chunkFetch, setup } from "./harness";
+import { effectiveLevel } from "./config.js";
+import { chunkFetch, setup } from "./harness.js";
 
 afterEach(() => {
   document.body.innerHTML = "";

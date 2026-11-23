@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkCtx } from "../instrument/testutil";
-import { toFolded, type ProfilerTrace } from "./folded";
-import { installProfiling, START_DELAY_MS, WINDOW_MS } from "./index";
+import { mkCtx } from "../instrument/testutil.js";
+import { toFolded, type ProfilerTrace } from "./folded.js";
+import { installProfiling, START_DELAY_MS, WINDOW_MS } from "./index.js";
 
 const TRACE: ProfilerTrace = {
   resources: ["https://app.test/a.js?token=secret", "https://app.test/b.js"],

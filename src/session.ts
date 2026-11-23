@@ -1,5 +1,5 @@
-import { LIMITS } from "./config";
-import { rand, uuid } from "./ids";
+import { LIMITS } from "./config.js";
+import { rand, uuid } from "./ids.js";
 
 interface Stored {
   id: string;

@@ -36,8 +36,8 @@ export interface WtVital {
   final: boolean;
 }
 
-import type { ReplayConfig } from "./replay/config";
-import type { AssistConfig } from "./assist";
+import type { ReplayConfig } from "./replay/config.js";
+import type { AssistConfig } from "./assist.js";
 export type { ReplayConfig };
 
 export interface FlagAdapter {

@@ -1,5 +1,5 @@
-import type { RumEventV1, WatchtowerConfig } from "../config";
-import { normalizeRoute, type Ctx, type NavInfo } from "./ctx";
+import type { RumEventV1, WatchtowerConfig } from "../config.js";
+import { normalizeRoute, type Ctx, type NavInfo } from "./ctx.js";
 
 export const baseCfg: WatchtowerConfig = {
   publishableKey: "wtp_abcd1234_x",

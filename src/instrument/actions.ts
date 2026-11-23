@@ -1,5 +1,5 @@
 import { ROOT_CONTEXT, trace, type Context, type ContextManager, type Span, type Tracer } from "@opentelemetry/api";
-import { selectorOf, type Ctx, type Uninstall } from "./ctx";
+import { selectorOf, type Ctx, type Uninstall } from "./ctx.js";
 
 /** An action ends this long after its last child span ended, or at the hard cap. */
 export const ACTION_IDLE_MS = 100;

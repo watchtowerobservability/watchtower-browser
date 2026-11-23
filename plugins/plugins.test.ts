@@ -2,9 +2,9 @@ import { mkdtemp, readFile, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { debugIdFor, injectDebugId } from "./debugid";
-import { resolveRelease, uploadMaps } from "./upload";
-import { watchtower } from "./vite";
+import { debugIdFor, injectDebugId } from "./debugid.js";
+import { resolveRelease, uploadMaps } from "./upload.js";
+import { watchtower } from "./vite.js";
 
 const ok = (): Promise<Response> => Promise.resolve(new Response("{}", { status: 201 }));
 

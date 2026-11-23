@@ -1,4 +1,4 @@
-import { normalizeRoute, scrubUrl, type Ctx, type NavInfo, type Uninstall } from "./ctx";
+import { normalizeRoute, scrubUrl, type Ctx, type NavInfo, type Uninstall } from "./ctx.js";
 
 // The adapters and the instrument ship as separate bundles (dist/adapters, dist/instrument), each with its own
 // copy of this module, so the route lives on one global object both copies share (W-30: module-level state split).

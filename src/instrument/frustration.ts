@@ -1,4 +1,4 @@
-import { selectorOf, type Ctx, type Uninstall } from "./ctx";
+import { selectorOf, type Ctx, type Uninstall } from "./ctx.js";
 
 const WINDOW_MS = 1000;
 const RADIUS = 100;

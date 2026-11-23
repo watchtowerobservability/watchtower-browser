@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cookieMunchConsent } from "./consent";
+import { cookieMunchConsent } from "./consent.js";
 
 const wt = () => ({ grantConsent: vi.fn(), revokeConsent: vi.fn(), replay: { start: vi.fn(), stop: vi.fn(), flush: vi.fn() } });
 const set = (hasResponse: boolean, consent: Record<string, boolean>) => ((window as any).CookieMunch = { hasResponse, consent });

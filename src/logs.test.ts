@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { LogShipper } from "./logs";
-import { MemoryStore } from "./queue";
+import { LogShipper } from "./logs.js";
+import { MemoryStore } from "./queue.js";
 
 afterEach(() => {
   vi.useRealTimers();

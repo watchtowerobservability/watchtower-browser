@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeJourney } from "./journeys";
+import { makeJourney } from "./journeys.js";
 
 describe("journeys", () => {
   it("journey_step_failure_event", () => {

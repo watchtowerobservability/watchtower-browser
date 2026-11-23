@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 // @ts-expect-error plain .mjs shared with esbuild.config.mjs
 import { buildManifest, listJs } from "../manifest.mjs";
-import { chunkFailed, resetChunkErrors } from "./chunk-error";
-import { init } from "./index";
-import { storageDeclaration } from "./storage-declaration";
+import { chunkFailed, resetChunkErrors } from "./chunk-error.js";
+import { init } from "./index.js";
+import { storageDeclaration } from "./storage-declaration.js";
 
 describe("buildManifest", () => {
   it("lists nested js files with size, sha256 and sri, skips others", () => {

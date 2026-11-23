@@ -1,4 +1,4 @@
-import { scrubScriptUrl, scrubUrl, type Ctx, type Uninstall } from "./ctx";
+import { scrubScriptUrl, scrubUrl, type Ctx, type Uninstall } from "./ctx.js";
 
 export interface Frame {
   filename: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { WtVital } from "../config";
-import { mkCtx } from "./testutil";
+import type { WtVital } from "../config.js";
+import { mkCtx } from "./testutil.js";
 
 const cbs: Record<string, (m: unknown) => void> = {};
 vi.mock("web-vitals/attribution", () => ({
@@ -10,7 +10,7 @@ vi.mock("web-vitals/attribution", () => ({
   onFCP: (f: (m: unknown) => void) => void (cbs.FCP = f),
   onTTFB: (f: (m: unknown) => void) => void (cbs.TTFB = f),
 }));
-import { installVitals } from "./vitals";
+import { installVitals } from "./vitals.js";
 
 describe("vital hook", () => {
   it("fires_once_per_vital_when_the_page_is_hidden", async () => {
