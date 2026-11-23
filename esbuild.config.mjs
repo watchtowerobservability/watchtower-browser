@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 // Hashed chunks change name every build: without this, stale ones from older builds pile up in dist/ and get published.
 rmSync("dist", { recursive: true, force: true });
-const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, target: "es2020", sourcemap: true, define: { ...define, __WT_IIFE__: "false" } };
+const common = { entryPoints: ["src/index.ts"], bundle: true, minify: true, target: "es2020", sourcemap: false, define: { ...define, __WT_IIFE__: "false" } };
 await build({ ...common, format: "esm", plugins: [lazyChunks], outfile: "dist/index.js" });
 // iife has no import.meta: lazy chunks resolve next to the script tag that loaded wt.min.js.
 await build({ ...common, format: "iife", plugins: [lazyChunks], banner: { js: "var __wtUrl=(document.currentScript&&document.currentScript.src)||location.href;" }, define: { ...define, __WT_IIFE__: "true", "import.meta.url": "__wtUrl" }, globalName: "Watchtower", outfile: "dist/wt.min.js" });
@@ -14,7 +14,7 @@ await build({ ...common, format: "iife", plugins: [lazyChunks], banner: { js: "v
 await build({ ...common, entryPoints: ["src/lite.ts"], format: "esm", plugins: [liteChunks, lazyChunks], outfile: "dist/lite.js" });
 // `/beacon` entry: ~1.5 KB RUM beacon (vitals + errors, one sendBeacon), ESM and a script-tag IIFE.
 await build({ ...common, entryPoints: ["src/beacon.ts"], format: "esm", outfile: "dist/beacon.js" });
-await build({ ...common, entryPoints: ["src/beacon.ts"], format: "iife", globalName: "WatchtowerBeacon", sourcemap: false, outfile: "dist/beacon.min.js" });
+await build({ ...common, entryPoints: ["src/beacon.ts"], format: "iife", globalName: "WatchtowerBeacon", outfile: "dist/beacon.min.js" });
 // `/errors` entry: consent-free, storage-free error capture (handed off to the full client when it starts).
 await build({ ...common, entryPoints: ["src/errors.ts"], format: "esm", outfile: "dist/errors.js" });
 // Lazy replay chunk (rrweb record + fflate), loaded on demand by the core via `replay.scriptUrl`.
